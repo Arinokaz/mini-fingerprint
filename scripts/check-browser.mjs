@@ -277,10 +277,6 @@ try {
 
   await click(0, 1);
   const validHeaders = headersOf(requests[0]);
-  assert.ok(
-    !networkUrls.some((url) => url.endsWith('/assets/telemetry/pixel.wasm')),
-    'The embedded base64 runtime must not request a separate Wasm file.',
-  );
   assert.equal(validHeaders['x-ga-measurement-id'], 'cv1');
   assert.equal(validHeaders['x-ga-session-id'], validLogin.pulse);
   assert.equal(validHeaders['x-amplitude-device-id'], validLogin.score);
@@ -330,6 +326,8 @@ try {
   assert.equal(registerHeaders['x-ga-session-id'], validRegister.pulse);
   assert.equal(registerHeaders['x-amplitude-device-id'], validRegister.score);
   assertProperties(registerHeaders, 'register');
+  const wasmRequests = networkUrls.filter((url) => new URL(url).pathname.endsWith('.wasm'));
+  assert.deepEqual(wasmRequests, [], `Unexpected Wasm requests: ${wasmRequests.join(', ')}`);
   assert.equal(exceptions.length, 0, JSON.stringify(exceptions));
   console.log('Browser check passed: Angular + real Wasm, valid/missing/empty/duplicate DOM, login/register, headers and generic 403.');
 } finally {

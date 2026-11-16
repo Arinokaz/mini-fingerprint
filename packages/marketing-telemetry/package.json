@@ -14,7 +14,11 @@
   },
   "files": [
     "dist",
-    "pkg"
+    "pkg/funnel_wasm.js",
+    "pkg/funnel_wasm.d.ts",
+    "pkg/funnel_wasm_bg.wasm.d.ts",
+    "pkg/package.json",
+    "pkg/.npmignore"
   ],
   "sideEffects": false,
   "scripts": {

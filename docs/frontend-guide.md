@@ -128,7 +128,7 @@ packages/marketing-telemetry/src/generated-pixel.ts
 export const PIXEL_BASE64 = 'AGFzbQEAAAAB...';
 ```
 
-Сырой `pixel.wasm` остаётся доступен для низкоуровневых тестов и анализа, но **Angular его не запрашивает и не копирует в public assets**.
+Сырой `pixel.wasm` остаётся доступен для низкоуровневых тестов и анализа, но **Angular его не запрашивает и не копирует в public assets**. В `npm pack` включаются только скомпилированный `dist`, JS glue и declarations; raw `.wasm` исключается через generated `pkg/.npmignore`. Тест `package-contents.test.ts` проверяет это при каждом `npm test`.
 
 ### Точка входа Rust
 
