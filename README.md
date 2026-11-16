@@ -20,7 +20,7 @@
 
 ## Требования
 
-- Node.js 22+ и npm.
+- Node.js `^22.12.0 || >=24.0.0` и npm, совместимые с Angular 21.
 - Rust stable через `rustup`, target `wasm32-unknown-unknown`.
 - `wasm-pack` для последующих этапов.
 - PHP 8.4+ и Composer понадобятся только для отложенного серверного этапа.
@@ -62,7 +62,8 @@ npm run test:browser
 - `prebuild` Angular копирует существующий Wasm в `public/assets/telemetry` без скачиваний.
 - `npm test` проверяет контракт, TypeScript-фасад, реальный Wasm и сервис отправки.
 - `test:browser` запускает production Angular в уже установленном Chromium, перехватывает пять запросов и проверяет валидный/missing/empty/duplicate DOM, login/register и формат заголовков.
-- В WSL скрипт автоматически использует существующие Windows Node.js и Chrome, если они доступны по стандартным путям. Можно задать `CHROME_BIN`.
+- В WSL скрипт автоматически использует существующие Windows Node.js 22+ и Chrome только при выборе Windows-браузера. Явный Linux `CHROME_BIN` имеет приоритет; делегирование Windows можно запретить через `BROWSER_CHECK_NO_WINDOWS=1`.
+- Browser-проверка сверяет production `pulse` и `score` с независимыми golden fixtures и декодирует свойства всех пяти запросов.
 
 PHP endpoints сейчас не реализованы. Browser-сервер намеренно возвращает generic `403`, чтобы проверить отправку заголовков и пользовательский статус без backend.
 

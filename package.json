@@ -9,13 +9,13 @@
     "packages/*"
   ],
   "engines": {
-    "node": ">=22"
+    "node": "^22.12.0 || >=24.0.0"
   },
   "scripts": {
     "check:contract": "node scripts/check-contract.mjs",
     "build:wasm": "node scripts/build-wasm.mjs",
     "test": "npm run check:contract && npm test --workspaces --if-present",
     "test:browser": "node scripts/check-browser.mjs",
-    "build": "npm run build:wasm && npm run build --workspaces --if-present"
+    "build": "npm run build:wasm && npm run build --workspace @company/marketing-telemetry && npm run build --workspace demo-web"
   }
 }

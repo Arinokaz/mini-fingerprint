@@ -2,23 +2,14 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { createReadStream } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { dirname, extname, isAbsolute, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 
-// WSL cannot reliably reach a Windows browser's loopback DevTools socket.
-// Reuse an existing Windows Node.js when present; no packages are downloaded.
-const windowsNode = '/mnt/c/Program Files/nodejs/node.exe';
-if (process.platform === 'linux' && process.env['WSL_DISTRO_NAME'] && existsSync(windowsNode)) {
-  const scriptPath = execFileSync('wslpath', ['-w', fileURLToPath(import.meta.url)], { encoding: 'utf8' }).trim();
-  const result = spawnSync(windowsNode, [scriptPath], { stdio: 'inherit' });
-  process.exit(result.status ?? 1);
-}
-
-/** Repository root and production output under test. */
+ /** Repository root and production output under test. */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const browserRoot = resolve(root, 'apps/demo-web/dist/demo-web/browser');
 const profileDirectory = resolve(tmpdir(), 'opencode', 'chrome-profile');
@@ -38,7 +29,33 @@ const candidates = [
 ].filter(Boolean);
 const chrome = candidates.find((candidate) => existsSync(candidate));
 assert.ok(chrome, 'No existing Chromium browser found; set CHROME_BIN or install one explicitly.');
+
+// Delegate only when the selected browser is a Windows binary. An explicit
+// Linux CHROME_BIN always stays on Linux. Set BROWSER_CHECK_NO_WINDOWS=1 to
+// disable delegation explicitly; native WebSocket requires Windows Node 22+.
+const windowsNode = '/mnt/c/Program Files/nodejs/node.exe';
+const selectedWindowsBrowser = process.platform === 'linux' && chrome.startsWith('/mnt/c/');
+const mayDelegate = process.env['BROWSER_CHECK_NO_WINDOWS'] !== '1';
+if (selectedWindowsBrowser && process.env['WSL_DISTRO_NAME'] && mayDelegate) {
+  assert.ok(
+    existsSync(windowsNode),
+    'A Windows browser requires existing Windows Node.js 22+; set CHROME_BIN to a Linux browser or BROWSER_CHECK_NO_WINDOWS=1.',
+  );
+  const versionResult = spawnSync(windowsNode, ['--version'], { encoding: 'utf8' });
+  const major = Number.parseInt(String(versionResult.stdout).replace(/^v/, '').split('.')[0], 10);
+  assert.ok(versionResult.status === 0 && major >= 22, 'Windows Node.js 22+ with native WebSocket is required.');
+  const scriptPath = execFileSync('wslpath', ['-w', fileURLToPath(import.meta.url)], { encoding: 'utf8' }).trim();
+  const result = spawnSync(windowsNode, [scriptPath], { stdio: 'inherit' });
+  process.exit(result.status ?? 1);
+}
+
 assert.ok(existsSync(resolve(browserRoot, 'index.html')), 'Build demo-web production before this check.');
+const fixtureDocument = JSON.parse(await readFile(resolve(root, 'tests/fixtures/conversion-v1.json'), 'utf8'));
+const fixtureByName = new Map(fixtureDocument.cases.map((testCase) => [testCase.name, testCase]));
+const validLogin = fixtureByName.get('login-production-valid');
+const missingLogin = fixtureByName.get('login-production-missing');
+const validRegister = fixtureByName.get('register-production-valid');
+assert.ok(validLogin && missingLogin && validRegister, 'Production golden fixtures are required.');
 await mkdir(profileDirectory, { recursive: true });
 
 /** Uses the native temporary filesystem so Chromium locking works on WSL too. */
@@ -197,11 +214,15 @@ try {
   const devtools = new DevTools(socket);
   const requests = [];
   const networkUrls = [];
+  const wasmResponses = [];
   const exceptions = [];
   const consoleMessages = [];
   devtools.onEvent((message) => {
     if (message.method === 'Runtime.consoleAPICalled') {
       consoleMessages.push(message.params.args.map((argument) => argument.value ?? argument.description).join(' '));
+    }
+    if (message.method === 'Network.responseReceived' && message.params.response.url.endsWith('/assets/telemetry/pixel.wasm')) {
+      wasmResponses.push(message.params.response);
     }
     if (message.method === 'Network.requestWillBeSent') {
       networkUrls.push(message.params.request.url);
@@ -232,6 +253,12 @@ try {
   const headersOf = (request) => Object.fromEntries(
     Object.entries(request.headers).map(([name, value]) => [name.toLowerCase(), value]),
   );
+  const assertProperties = (headers, expectedForm) => {
+    assert.deepEqual(
+      JSON.parse(Buffer.from(headers['x-amplitude-session-properties'], 'base64url').toString('utf8')),
+      [['form', expectedForm]],
+    );
+  };
   const click = async (index, expectedRequests) => {
     console.log(`Browser check: click button ${index}, expecting request ${expectedRequests}.`);
     await devtools.evaluate(`document.querySelectorAll('button')[${index}].click()`);
@@ -254,22 +281,23 @@ try {
 
   await click(0, 1);
   const validHeaders = headersOf(requests[0]);
+  assert.ok(networkUrls.some((url) => url.endsWith('/assets/telemetry/pixel.wasm')), 'Production must request pixel.wasm.');
+  assert.ok(wasmResponses.some((response) => response.status === 200), 'pixel.wasm must load successfully.');
   assert.equal(validHeaders['x-ga-measurement-id'], 'cv1');
-  assert.match(validHeaders['x-ga-session-id'], /^[0-9a-f]{16}$/);
-  assert.match(validHeaders['x-amplitude-device-id'], /^[0-9a-f]{64}$/);
+  assert.equal(validHeaders['x-ga-session-id'], validLogin.pulse);
+  assert.equal(validHeaders['x-amplitude-device-id'], validLogin.score);
   assert.equal(validHeaders['x-ym-counter-client'], 'v2.10.4-pixel');
-  assert.deepEqual(
-    JSON.parse(Buffer.from(validHeaders['x-amplitude-session-properties'], 'base64url').toString('utf8')),
-    [['form', 'login']],
-  );
+  assertProperties(validHeaders, 'login');
   assert.ok(!Object.keys(validHeaders).includes('x-client-timestamp'));
 
   // Removing the only marker must still produce a request with a different score.
   await devtools.evaluate("document.querySelector('span.telemetrics_click').remove()");
   await click(0, 2);
   const missingHeaders = headersOf(requests[1]);
-  assert.equal(missingHeaders['x-ga-session-id'], validHeaders['x-ga-session-id']);
+  assert.equal(missingHeaders['x-ga-session-id'], missingLogin.pulse);
+  assert.equal(missingHeaders['x-amplitude-device-id'], missingLogin.score);
   assert.notEqual(missingHeaders['x-amplitude-device-id'], validHeaders['x-amplitude-device-id']);
+  assertProperties(missingHeaders, 'login');
 
   // Empty and duplicate markers resolve to the same fallback and deterministic score.
   await devtools.evaluate(`(() => {
@@ -279,7 +307,8 @@ try {
     document.querySelector('app-root').appendChild(span);
   })()`);
   await click(0, 3);
-  assert.equal(headersOf(requests[2])['x-amplitude-device-id'], missingHeaders['x-amplitude-device-id']);
+  assert.equal(headersOf(requests[2])['x-amplitude-device-id'], missingLogin.score);
+  assertProperties(headersOf(requests[2]), 'login');
 
   await devtools.evaluate(`(() => {
     const second = document.createElement('span');
@@ -288,10 +317,21 @@ try {
     document.querySelector('app-root').appendChild(second);
   })()`);
   await click(0, 4);
-  assert.equal(headersOf(requests[3])['x-amplitude-device-id'], missingHeaders['x-amplitude-device-id']);
+  assert.equal(headersOf(requests[3])['x-amplitude-device-id'], missingLogin.score);
+  assertProperties(headersOf(requests[3]), 'login');
 
+  await devtools.evaluate(`(() => {
+    document.querySelectorAll('span.telemetrics_click').forEach((element) => element.remove());
+    const valid = document.createElement('span');
+    valid.className = 'telemetrics_click';
+    valid.dataset.tag = 'production-build-tag';
+    document.querySelector('app-root').appendChild(valid);
+  })()`);
   await click(1, 5);
-  assert.notEqual(headersOf(requests[4])['x-amplitude-device-id'], missingHeaders['x-amplitude-device-id']);
+  const registerHeaders = headersOf(requests[4]);
+  assert.equal(registerHeaders['x-ga-session-id'], validRegister.pulse);
+  assert.equal(registerHeaders['x-amplitude-device-id'], validRegister.score);
+  assertProperties(registerHeaders, 'register');
   assert.equal(exceptions.length, 0, JSON.stringify(exceptions));
   console.log('Browser check passed: Angular + real Wasm, valid/missing/empty/duplicate DOM, login/register, headers and generic 403.');
 } finally {

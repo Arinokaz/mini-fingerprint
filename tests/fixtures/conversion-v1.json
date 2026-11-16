@@ -543,6 +543,195 @@
       },
       "score": "09ed8c78939e6835937fed9945ce7e40e8b28ee0645d52a1f66d9d2f6344dc77",
       "expectedServerMatch": false
+    },
+    {
+      "name": "login-production-valid",
+      "journey": "/api/auth/login",
+      "anchorState": "valid",
+      "observedTag": "production-build-tag",
+      "selectedTag": "production-build-tag",
+      "inputProperties": [
+        [
+          "form",
+          "login"
+        ]
+      ],
+      "canonicalPropertiesJson": "[[\"form\",\"login\"]]",
+      "canonicalPropertiesHex": "04000000666f726d050000006c6f67696e",
+      "now": 1700000000,
+      "selectedWindow": 1699999920,
+      "pulse": "e4101bc8af581d85",
+      "decodedWindow": 1699999920,
+      "stages": {
+        "journey": [
+          "3cd54917",
+          "345b40c8",
+          "7b6e58f6",
+          "49686d88",
+          "bfd3b1f6",
+          "483965a0",
+          "50088dff",
+          "373321eb"
+        ],
+        "touchpoint": [
+          "3989a0dc",
+          "fe511bc0",
+          "baaa7854",
+          "3c239268",
+          "7d1caa30",
+          "8a9588b1",
+          "7e14a12a",
+          "579fe3bf"
+        ],
+        "properties": [
+          "7ae078a3",
+          "c818a626",
+          "6420fdcd",
+          "984da61d",
+          "5b8f2aef",
+          "4223165e",
+          "6b50884b",
+          "bf97fdfc"
+        ],
+        "pulse": [
+          "c0d7b4e4",
+          "0e76053c",
+          "1bd214c1",
+          "46930592",
+          "eac67ae4",
+          "a94a3a7a",
+          "980e0e10",
+          "0e7bf8fe"
+        ]
+      },
+      "score": "e4b4d7c03c05760ec114d21b92059346e47ac6ea7a3a4aa9100e0e98fef87b0e",
+      "expectedServerMatch": true
+    },
+    {
+      "name": "login-production-missing",
+      "journey": "/api/auth/login",
+      "anchorState": "missing",
+      "observedTag": null,
+      "selectedTag": "telemetry.unresolved.v1",
+      "inputProperties": [
+        [
+          "form",
+          "login"
+        ]
+      ],
+      "canonicalPropertiesJson": "[[\"form\",\"login\"]]",
+      "canonicalPropertiesHex": "04000000666f726d050000006c6f67696e",
+      "now": 1700000000,
+      "selectedWindow": 1699999920,
+      "pulse": "e4101bc8af581d85",
+      "decodedWindow": 1699999920,
+      "stages": {
+        "journey": [
+          "3cd54917",
+          "345b40c8",
+          "7b6e58f6",
+          "49686d88",
+          "bfd3b1f6",
+          "483965a0",
+          "50088dff",
+          "373321eb"
+        ],
+        "touchpoint": [
+          "d0b5e081",
+          "613db1f3",
+          "b333e5d7",
+          "bb0bd8cb",
+          "cdb34057",
+          "b1c39bc7",
+          "729eedac",
+          "9effa399"
+        ],
+        "properties": [
+          "c572ce5c",
+          "7371d84d",
+          "a211d9b1",
+          "9ce7d9d9",
+          "53dee915",
+          "0cbbd2fa",
+          "bb5c7c00",
+          "537749ec"
+        ],
+        "pulse": [
+          "34d61cf2",
+          "eb76b232",
+          "205463bf",
+          "d4f2b7b1",
+          "88efa7c7",
+          "4fcd9077",
+          "735c3641",
+          "b9e24051"
+        ]
+      },
+      "score": "f21cd63432b276ebbf635420b1b7f2d4c7a7ef887790cd4f41365c735140e2b9",
+      "expectedServerMatch": false
+    },
+    {
+      "name": "register-production-valid",
+      "journey": "/api/auth/register",
+      "anchorState": "valid",
+      "observedTag": "production-build-tag",
+      "selectedTag": "production-build-tag",
+      "inputProperties": [
+        [
+          "form",
+          "register"
+        ]
+      ],
+      "canonicalPropertiesJson": "[[\"form\",\"register\"]]",
+      "canonicalPropertiesHex": "04000000666f726d080000007265676973746572",
+      "now": 1700000000,
+      "selectedWindow": 1699999920,
+      "pulse": "e4101bc8af581d85",
+      "decodedWindow": 1699999920,
+      "stages": {
+        "journey": [
+          "c1ee5c1b",
+          "7de3ed90",
+          "be0900b1",
+          "2688bef6",
+          "9a03b896",
+          "7489e938",
+          "89bb3422",
+          "2afa3097"
+        ],
+        "touchpoint": [
+          "0d366db1",
+          "26f5e0e5",
+          "f2157966",
+          "d200c7f9",
+          "254f87f8",
+          "d2985d61",
+          "b6bc4adf",
+          "1a335249"
+        ],
+        "properties": [
+          "9efe7db6",
+          "584ff946",
+          "3d235f53",
+          "09267085",
+          "46afd16c",
+          "cebc9029",
+          "1fe6ab5a",
+          "9431da7e"
+        ],
+        "pulse": [
+          "eae55b29",
+          "062d7593",
+          "30a72bd1",
+          "ec2b9872",
+          "afcdbaee",
+          "df8432d7",
+          "2cd5836f",
+          "dbd6bac8"
+        ]
+      },
+      "score": "295be5ea93752d06d12ba73072982beceebacdafd73284df6f83d52cc8bad6db",
+      "expectedServerMatch": true
     }
   ]
 }
