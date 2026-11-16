@@ -1,5 +1,7 @@
 //! Validation and owned data associated with the requested API journey.
 
+use crate::codec::CanonicalProperties;
+use crate::pulse::encode_pulse;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
@@ -50,4 +52,68 @@ pub fn validate_journey(journey: &str) -> Result<(), JourneyError> {
         ));
     }
     Ok(())
+}
+
+/// Owned inputs shared by every stage of one conversion run.
+#[derive(Debug, Clone)]
+pub struct JourneyContext {
+    /// Absolute API path supplied by the Angular facade.
+    journey: String,
+    /// Valid DOM marker or the deterministic unresolved fallback.
+    touchpoint: String,
+    /// Additional properties already validated and placed in canonical order.
+    properties: CanonicalProperties,
+    /// Temporal window selected inside the Wasm module.
+    selected_window: u64,
+    /// Reversible representation mixed into the final stage and sent to PHP.
+    pulse: (u32, u32),
+}
+
+impl JourneyContext {
+    /// Validates environment-derived strings and precomputes the encoded pulse.
+    pub fn new(
+        journey: &str,
+        touchpoint: &str,
+        properties: CanonicalProperties,
+        selected_window: u64,
+    ) -> Result<Self, JourneyError> {
+        validate_journey(journey)?;
+        if touchpoint.is_empty() || touchpoint.len() > 256 {
+            return Err(JourneyError::new(
+                "touchpoint must contain 1..=256 UTF-8 bytes",
+            ));
+        }
+        Ok(Self {
+            journey: journey.to_owned(),
+            touchpoint: touchpoint.to_owned(),
+            properties,
+            selected_window,
+            pulse: encode_pulse(selected_window),
+        })
+    }
+
+    /// Returns the absolute API path consumed by the journey stage.
+    pub fn journey(&self) -> &str {
+        &self.journey
+    }
+
+    /// Returns the selected DOM value consumed by the touchpoint stage.
+    pub fn touchpoint(&self) -> &str {
+        &self.touchpoint
+    }
+
+    /// Returns canonical additional properties consumed by the property stage.
+    pub fn properties(&self) -> &CanonicalProperties {
+        &self.properties
+    }
+
+    /// Returns the decoded window used in the pulse payload.
+    pub fn selected_window(&self) -> u64 {
+        self.selected_window
+    }
+
+    /// Returns the encoded words used in the pulse payload and HTTP header.
+    pub fn pulse(&self) -> (u32, u32) {
+        self.pulse
+    }
 }
