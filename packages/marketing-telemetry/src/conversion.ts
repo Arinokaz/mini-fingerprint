@@ -12,7 +12,6 @@ import type {
   ConversionProperty,
   PixelRuntime,
   RuntimeLoader,
-  TelemetrySettings,
 } from './types.js';
 
 /** Public marketing-style facade hiding browser and Wasm integration details. */
@@ -20,9 +19,9 @@ export class TelemetrySdk {
   /** Lazy initializer shared by every submission made through this instance. */
   private readonly runtime: RuntimeGate;
 
-  /** Creates a facade; the optional loader is intended for native TS tests. */
-  constructor(settings: TelemetrySettings, loader: RuntimeLoader = loadPixelRuntime) {
-    this.runtime = new RuntimeGate(settings.pixelUrl, loader);
+  /** Creates an embedded-runtime facade; the optional loader supports TS tests. */
+  constructor(loader: RuntimeLoader = loadPixelRuntime) {
+    this.runtime = new RuntimeGate(loader);
   }
 
   /** Generates camouflaged headers immediately before an API submission. */

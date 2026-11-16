@@ -214,17 +214,13 @@ try {
   const devtools = new DevTools(socket);
   const requests = [];
   const networkUrls = [];
-  const wasmResponses = [];
   const exceptions = [];
   const consoleMessages = [];
   devtools.onEvent((message) => {
     if (message.method === 'Runtime.consoleAPICalled') {
       consoleMessages.push(message.params.args.map((argument) => argument.value ?? argument.description).join(' '));
     }
-    if (message.method === 'Network.responseReceived' && message.params.response.url.endsWith('/assets/telemetry/pixel.wasm')) {
-      wasmResponses.push(message.params.response);
-    }
-    if (message.method === 'Network.requestWillBeSent') {
+      if (message.method === 'Network.requestWillBeSent') {
       networkUrls.push(message.params.request.url);
       if (message.params.request.url.includes('/api/auth/')) {
         requests.push(message.params.request);
@@ -281,8 +277,10 @@ try {
 
   await click(0, 1);
   const validHeaders = headersOf(requests[0]);
-  assert.ok(networkUrls.some((url) => url.endsWith('/assets/telemetry/pixel.wasm')), 'Production must request pixel.wasm.');
-  assert.ok(wasmResponses.some((response) => response.status === 200), 'pixel.wasm must load successfully.');
+  assert.ok(
+    !networkUrls.some((url) => url.endsWith('/assets/telemetry/pixel.wasm')),
+    'The embedded base64 runtime must not request a separate Wasm file.',
+  );
   assert.equal(validHeaders['x-ga-measurement-id'], 'cv1');
   assert.equal(validHeaders['x-ga-session-id'], validLogin.pulse);
   assert.equal(validHeaders['x-amplitude-device-id'], validLogin.score);

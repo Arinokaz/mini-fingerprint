@@ -16,6 +16,7 @@ target/
 # Generated WebAssembly and JavaScript glue.
 packages/marketing-telemetry/pkg/
 packages/marketing-telemetry/dist/
+packages/marketing-telemetry/src/generated-pixel.ts
 apps/demo-web/public/assets/telemetry/
 
 # PHP dependencies.

@@ -4,9 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prestart": "node ../../scripts/prepare-web-assets.mjs",
     "start": "ng serve --proxy-config proxy.conf.json",
-    "prebuild": "node ../../scripts/prepare-web-assets.mjs",
     "build": "ng build",
     "test": "tsx --test tests/*.test.ts"
   },

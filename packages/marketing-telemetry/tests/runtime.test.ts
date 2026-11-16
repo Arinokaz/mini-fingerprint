@@ -9,7 +9,7 @@ const runtime: PixelRuntime = {
 
 test('loading starts only when the runtime is first requested', async () => {
   let loads = 0;
-  const gate = new RuntimeGate('/assets/pixel.wasm', async () => {
+  const gate = new RuntimeGate(async () => {
     loads += 1;
     return runtime;
   });
@@ -25,7 +25,7 @@ test('concurrent requests share one in-flight initialization', async () => {
   const pending = new Promise<PixelRuntime>((resolve) => {
     release = resolve;
   });
-  const gate = new RuntimeGate('/assets/pixel.wasm', async () => {
+  const gate = new RuntimeGate(async () => {
     loads += 1;
     return pending;
   });
@@ -41,7 +41,7 @@ test('concurrent requests share one in-flight initialization', async () => {
 
 test('a failed initialization can be retried', async () => {
   let loads = 0;
-  const gate = new RuntimeGate('/assets/pixel.wasm', async () => {
+  const gate = new RuntimeGate(async () => {
     loads += 1;
     if (loads === 1) {
       throw new Error('network unavailable');

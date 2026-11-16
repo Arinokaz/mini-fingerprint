@@ -21,10 +21,14 @@ test('real Wasm reproduces the missing-DOM fixture and emits stable telemetry he
   ));
   const testCase = fixture.cases.find((candidate: { name: string }) => candidate.name === 'login-missing-anchor');
   const originalNow = Date.now;
+  const originalFetch = globalThis.fetch;
 
   try {
     Date.now = () => testCase.now * 1000;
-    const sdk = new TelemetrySdk({ pixelUrl: '/unused-in-this-test/pixel.wasm' }, loadGeneratedPixel);
+    globalThis.fetch = async () => {
+      throw new Error('The embedded base64 runtime must not fetch a Wasm asset');
+    };
+    const sdk = new TelemetrySdk();
     const headers = await sdk.getConversionHeaders(
       testCase.journey,
       Object.fromEntries(testCase.inputProperties),
@@ -57,5 +61,6 @@ test('real Wasm reproduces the missing-DOM fixture and emits stable telemetry he
     assert.equal(payload.pulse, testCase.pulse);
   } finally {
     Date.now = originalNow;
+    globalThis.fetch = originalFetch;
   }
 });

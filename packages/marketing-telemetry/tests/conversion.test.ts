@@ -25,7 +25,7 @@ function decodeProperties(value: string): unknown {
 test('facade forwards the API path and properties without a timestamp argument', async () => {
   const calls: string[][] = [];
   const runtime = runtimeReturning({ profile: 'cv1', pulse, score, properties: canonicalPairs }, calls);
-  const sdk = new TelemetrySdk({ pixelUrl: '/assets/pixel.wasm' }, async () => runtime);
+  const sdk = new TelemetrySdk(async () => runtime);
 
   const headers = await sdk.getConversionHeaders('/api/auth/login', {
     'z.last': 'value:with:colon',
@@ -46,7 +46,7 @@ test('facade forwards the API path and properties without a timestamp argument',
 
 test('empty properties use the canonical empty pair array', async () => {
   const runtime = runtimeReturning({ profile: 'cv1', pulse, score, properties: [] });
-  const sdk = new TelemetrySdk({ pixelUrl: '/assets/pixel.wasm' }, async () => runtime);
+  const sdk = new TelemetrySdk(async () => runtime);
 
   const headers = await sdk.getConversionHeaders('/api/auth/register');
   assert.deepEqual(decodeProperties(headers['X-Amplitude-Session-Properties']), []);
@@ -55,7 +55,7 @@ test('empty properties use the canonical empty pair array', async () => {
 test('facade shares initialization across concurrent submissions', async () => {
   let loads = 0;
   const runtime = runtimeReturning({ profile: 'cv1', pulse, score, properties: [] });
-  const sdk = new TelemetrySdk({ pixelUrl: '/assets/pixel.wasm' }, async () => {
+  const sdk = new TelemetrySdk(async () => {
     loads += 1;
     return runtime;
   });
@@ -69,7 +69,6 @@ test('facade shares initialization across concurrent submissions', async () => {
 
 test('malformed runtime payloads are rejected instead of creating partial headers', async () => {
   const sdk = new TelemetrySdk(
-    { pixelUrl: '/assets/pixel.wasm' },
     async () => runtimeReturning({ profile: 'cv1', pulse: 'plain-time', score: 'short', properties: [] }),
   );
 

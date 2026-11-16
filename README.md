@@ -16,7 +16,8 @@
 - [x] Проверка реальных заголовков в браузере и DOM-fallback сценариев.
 - [x] PHP-псевдокод для будущей зеркальной реализации.
 - [ ] PHP mirror и endpoints — отложено по решению владельца проекта.
-- [ ] Полная документация по расширению.
+- [x] Руководство по структуре и сборке фронтенда.
+- [ ] Дополнительная документация по расширению алгоритма.
 
 ## Требования
 
@@ -28,6 +29,8 @@
 - Python 3 не требуется для работы проекта: эталонные fixtures уже сохранены в репозитории.
 
 ## Структура
+
+Подробная карта всех исходников, generated-файлов и команд: [`docs/frontend-guide.md`](docs/frontend-guide.md).
 
 ```text
 apps/demo-web/                    Angular demo
@@ -58,10 +61,10 @@ npm test
 npm run test:browser
 ```
 
-- `build:wasm` собирает `packages/marketing-telemetry/pkg/pixel.wasm` без SHA/HMAC.
-- `prebuild` Angular копирует существующий Wasm в `public/assets/telemetry` без скачиваний.
-- `npm test` проверяет контракт, TypeScript-фасад, реальный Wasm и сервис отправки.
-- `test:browser` запускает production Angular в уже установленном Chromium, перехватывает пять запросов и проверяет валидный/missing/empty/duplicate DOM, login/register и формат заголовков.
+- `build:wasm` собирает `packages/marketing-telemetry/pkg/pixel.wasm` без SHA/HMAC и встраивает его байты base64-строкой в `src/generated-pixel.ts`.
+- NPM runtime декодирует base64 в `Uint8Array`; отдельный `.wasm` HTTP-запрос и копирование в Angular public assets не используются.
+- `npm test` проверяет контракт, TypeScript-фасад, реальный embedded Wasm с запрещённым `fetch` и сервис отправки.
+- `test:browser` запускает production Angular, проверяет отсутствие запроса `pixel.wasm`, точные значения заголовков, валидный/missing/empty/duplicate DOM и login/register.
 - В WSL скрипт автоматически использует существующие Windows Node.js 22+ и Chrome только при выборе Windows-браузера. Явный Linux `CHROME_BIN` имеет приоритет; делегирование Windows можно запретить через `BROWSER_CHECK_NO_WINDOWS=1`.
 - Browser-проверка сверяет production `pulse` и `score` с независимыми golden fixtures и декодирует свойства всех пяти запросов.
 

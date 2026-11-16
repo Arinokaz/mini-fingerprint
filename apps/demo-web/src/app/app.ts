@@ -18,8 +18,8 @@ export class App {
   /** Prevents duplicate submissions while a request is in flight. */
   protected readonly busy = signal(false);
 
-  /** Real local NPM facade configured with the public Wasm asset URL. */
-  private readonly telemetry = new TelemetrySdk({ pixelUrl: environment.pixelUrl });
+  /** Real local NPM facade with base64-embedded Wasm bytes. */
+  private readonly telemetry = new TelemetrySdk();
   /** Submission coordinator; no real account business logic is included. */
   private readonly demo = new ConversionDemoService(this.telemetry);
 

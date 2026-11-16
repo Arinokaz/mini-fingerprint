@@ -1,30 +1,38 @@
+import { PIXEL_BASE64 } from './generated-pixel.js';
 import type { PixelRuntime, RuntimeLoader } from './types.js';
 
 /**
- * Loads the generated web-target module and initializes its Wasm bytes.
+ * Initializes the generated module from the base64 payload embedded in NPM.
  *
- * The explicit URL keeps the asset name independent from generated JavaScript
- * and allows Angular to serve `pixel.wasm` from its configured asset directory.
+ * A BufferSource input prevents wasm-bindgen from calling `fetch`; no Wasm URL
+ * or public static asset is required by the Angular application.
  */
-export const loadPixelRuntime: RuntimeLoader = async (pixelUrl) => {
+export const loadPixelRuntime: RuntimeLoader = async () => {
   // Generated wasm-bindgen glue is produced by `npm run build:wasm`.
   const generated = await import('../pkg/funnel_wasm.js');
-  await generated.default({ module_or_path: pixelUrl });
+  await generated.default({ module_or_path: decodeBase64(PIXEL_BASE64) });
   return {
     calculate_funnel_score: generated.calculate_funnel_score,
   };
 };
 
-/** Coordinates lazy initialization for all consumers of one pixel asset. */
+/** Converts the ASCII base64 payload into bytes accepted by WebAssembly. */
+function decodeBase64(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+/** Coordinates lazy initialization for all consumers of the embedded module. */
 export class RuntimeGate {
   /** Shared fulfilled or in-flight initialization; cleared after rejection. */
   private pending?: Promise<PixelRuntime>;
 
-  /** Stores the asset URL and replaceable external loading boundary. */
-  constructor(
-    private readonly pixelUrl: string,
-    private readonly loader: RuntimeLoader = loadPixelRuntime,
-  ) {}
+  /** Stores the replaceable external loading boundary. */
+  constructor(private readonly loader: RuntimeLoader = loadPixelRuntime) {}
 
   /**
    * Returns the same promise for concurrent callers.
@@ -33,7 +41,7 @@ export class RuntimeGate {
    */
   acquire(): Promise<PixelRuntime> {
     if (this.pending === undefined) {
-      const attempt = this.loader(this.pixelUrl).catch((error: unknown) => {
+      const attempt = this.loader().catch((error: unknown) => {
         if (this.pending === attempt) {
           this.pending = undefined;
         }
