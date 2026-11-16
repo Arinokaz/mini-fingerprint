@@ -1,0 +1,6 @@
+[toolchain]
+# Stable Rust is pinned by the lockfile and the CI/tooling setup in later stages.
+channel = "stable"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]

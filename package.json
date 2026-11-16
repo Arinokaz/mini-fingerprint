@@ -1,0 +1,20 @@
+{
+  "name": "telemetry-wasm-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local Angular, TypeScript, Rust/Wasm and PHP telemetry conversion MVP.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check:contract": "node scripts/check-contract.mjs",
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "test": "npm run check:contract",
+    "build": "npm run build --workspaces --if-present"
+  }
+}

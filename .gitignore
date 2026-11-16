@@ -1,0 +1,31 @@
+# Local harness configuration and execution ledgers.
+.opencode/
+.superpowers/
+
+# JavaScript dependencies and build output.
+node_modules/
+dist/
+.angular/
+playwright-report/
+test-results/
+
+# Rust build output; Cargo.lock remains versioned.
+target/
+
+# Generated WebAssembly and JavaScript glue.
+packages/marketing-telemetry/pkg/
+packages/marketing-telemetry/dist/
+apps/demo-web/public/assets/telemetry/
+
+# PHP dependencies.
+server/vendor/
+
+# Local secrets and machine-specific environment.
+.env
+.env.local
+.env.*.local
+
+# Editor and operating-system noise.
+.DS_Store
+.idea/
+.vscode/
