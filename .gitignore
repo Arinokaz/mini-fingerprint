@@ -1,6 +1,7 @@
 # Local harness configuration and execution ledgers.
 .opencode/
 .superpowers/
+.tools/
 
 # JavaScript dependencies and build output.
 node_modules/
