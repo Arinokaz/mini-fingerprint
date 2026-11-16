@@ -1,6 +1,6 @@
 # Telemetry Wasm MVP
 
-Локальный MVP на Angular, TypeScript, Rust/Wasm и PHP 8.4. Клиентский API оформлен как маркетинговая телеметрия. Wasm получает API-путь, DOM-атрибут `span.telemetrics_click[data-tag]`, дополнительные свойства и текущее время, а PHP независимо повторяет собственный 32-битный алгоритм.
+Локальный MVP на Angular, TypeScript и Rust/Wasm. Клиентский API оформлен как маркетинговая телеметрия. Wasm получает API-путь, DOM-атрибут `span.telemetrics_click[data-tag]`, дополнительные свойства и текущее время. Независимая реализация зеркальной проверки на PHP 8.4 отложена; её псевдокод сохранён в документации.
 
 > Проект повышает стоимость статического анализа, но не доказывает подлинность браузера. Это не криптографическая схема и не замена серверным ограничениям brute-force.
 
@@ -12,17 +12,19 @@
 - [x] Контракт `cv1` и эталонные векторы.
 - [x] Чистое Rust-ядро.
 - [x] Wasm-интеграция и локальный NPM-пакет.
-- [ ] Зеркальная реализация PHP.
-- [ ] Angular demo и PHP endpoints.
-- [ ] Сквозные тесты и production-сборка.
-- [ ] Документация по расширению.
+- [x] Angular demo и production-сборка.
+- [x] Проверка реальных заголовков в браузере и DOM-fallback сценариев.
+- [x] PHP-псевдокод для будущей зеркальной реализации.
+- [ ] PHP mirror и endpoints — отложено по решению владельца проекта.
+- [ ] Полная документация по расширению.
 
 ## Требования
 
 - Node.js 22+ и npm.
 - Rust stable через `rustup`, target `wasm32-unknown-unknown`.
 - `wasm-pack` для последующих этапов.
-- PHP 8.4+ и Composer для серверных этапов.
+- PHP 8.4+ и Composer понадобятся только для отложенного серверного этапа.
+- Существующий Chromium/Chrome для browser-проверки; Playwright и дополнительные браузеры не требуются.
 - Python 3 не требуется для работы проекта: эталонные fixtures уже сохранены в репозитории.
 
 ## Структура
@@ -31,7 +33,7 @@
 apps/demo-web/                    Angular demo
 packages/marketing-telemetry/     Локальный TypeScript NPM-пакет
 crates/funnel-wasm/               Rust и браузерный Wasm-интерфейс
-server/                           PHP 8.4 mirror и demo routes
+docs/php-mirror-pseudocode.md     Псевдокод отложенной PHP-реализации
 contracts/conversion-v1.md       Нормативный протокол
 tests/fixtures/conversion-v1.json Общие Rust/PHP golden vectors
 scripts/                         Проверки и сборка
@@ -45,10 +47,27 @@ node scripts/check-contract.mjs
 npm run check:contract
 ```
 
-Проверка валидирует структуру fixtures, границы временных окон, формат состояний и итоговых значений. Побитовое совпадение вычислений будут проверять Rust- и PHP-тесты следующих этапов.
+Проверка валидирует структуру fixtures, границы временных окон, формат состояний и итоговых значений. Побитовое совпадение Rust с fixtures проверяется отдельным набором Rust-тестов.
+
+## Фронтенд: сборка и проверка
+
+```bash
+npm install
+npm run build
+npm test
+npm run test:browser
+```
+
+- `build:wasm` собирает `packages/marketing-telemetry/pkg/pixel.wasm` без SHA/HMAC.
+- `prebuild` Angular копирует существующий Wasm в `public/assets/telemetry` без скачиваний.
+- `npm test` проверяет контракт, TypeScript-фасад, реальный Wasm и сервис отправки.
+- `test:browser` запускает production Angular в уже установленном Chromium, перехватывает пять запросов и проверяет валидный/missing/empty/duplicate DOM, login/register и формат заголовков.
+- В WSL скрипт автоматически использует существующие Windows Node.js и Chrome, если они доступны по стандартным путям. Можно задать `CHROME_BIN`.
+
+PHP endpoints сейчас не реализованы. Browser-сервер намеренно возвращает generic `403`, чтобы проверить отправку заголовков и пользовательский статус без backend.
 
 ## Протокол в двух словах
 
 Восемь слов `u32` последовательно проходят этапы `journey`, `touchpoint`, `properties` и `pulse`. Результат — 256 бит в виде 64 строчных hex-символов. Временное окно кодируется обратимо и передаётся отдельно в виде 16 hex-символов. Никакие SHA, MD5 или HMAC не используются.
 
-Полное описание: [`contracts/conversion-v1.md`](contracts/conversion-v1.md).
+Полное описание: [`contracts/conversion-v1.md`](contracts/conversion-v1.md). Будущая серверная часть: [`docs/php-mirror-pseudocode.md`](docs/php-mirror-pseudocode.md).

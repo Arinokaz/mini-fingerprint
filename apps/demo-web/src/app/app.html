@@ -1,0 +1,27 @@
+<main class="demo">
+  <h1>Telemetry conversion demo</h1>
+  <p>Заголовки формируются непосредственно перед выбранным запросом.</p>
+
+  <label>
+    Email
+    <input #email type="email" autocomplete="username" value="demo@example.test">
+  </label>
+
+  <label>
+    Пароль
+    <input #password type="password" autocomplete="current-password" value="demo-password">
+  </label>
+
+  <div class="actions">
+    <button type="button" [disabled]="busy()" (click)="submit('/api/auth/login', email.value, password.value)">
+      Проверить login
+    </button>
+    <button type="button" [disabled]="busy()" (click)="submit('/api/auth/register', email.value, password.value)">
+      Проверить register
+    </button>
+  </div>
+
+  <p role="status" aria-live="polite">{{ status() }}</p>
+
+  <span class="telemetrics_click" [attr.data-tag]="touchpoint" hidden></span>
+</main>
