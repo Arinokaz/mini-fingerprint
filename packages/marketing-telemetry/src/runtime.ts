@@ -1,30 +1,10 @@
-import { PIXEL_BASE64 } from './generated-pixel.js';
 import type { PixelRuntime, RuntimeLoader } from './types.js';
 
-/**
- * Initializes the generated module from the base64 payload embedded in NPM.
- *
- * A BufferSource input prevents wasm-bindgen from calling `fetch`; no Wasm URL
- * or public static asset is required by the Angular application.
- */
+/** Loads the generated module only when the first conversion is requested. */
 export const loadPixelRuntime: RuntimeLoader = async () => {
-  // Generated wasm-bindgen glue is produced by `npm run build:wasm`.
-  const generated = await import('../pkg/funnel_wasm.js');
-  await generated.default({ module_or_path: decodeBase64(PIXEL_BASE64) });
-  return {
-    calculate_funnel_score: generated.calculate_funnel_score,
-  };
+  const pixel = await import('./pixel-runtime.js');
+  return pixel.instantiatePixelRuntime();
 };
-
-/** Converts the ASCII base64 payload into bytes accepted by WebAssembly. */
-function decodeBase64(value: string): Uint8Array {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
 
 /** Coordinates lazy initialization for all consumers of the embedded module. */
 export class RuntimeGate {
