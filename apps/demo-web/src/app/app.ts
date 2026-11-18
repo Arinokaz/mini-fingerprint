@@ -3,7 +3,10 @@ import { TelemetrySdk } from '@company/marketing-telemetry';
 import { environment } from '../environments/environment';
 import { ApiJourney, ConversionDemoService } from './conversion-demo.service';
 
-/** One-page component demonstrating login and registration header generation. */
+/**
+ * Корневой компонент одностраничного login/register demo.
+ * Управляет состоянием формы, а вычисления и отправку делегирует сервисам.
+ */
 @Component({
   selector: 'app-root',
   templateUrl: './app.html',
@@ -11,19 +14,22 @@ import { ApiJourney, ConversionDemoService } from './conversion-demo.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class App {
-  /** Local build marker rendered into the hidden DOM touchpoint. */
+  /** DOM marker текущей сборки, передаваемый в шаблон через data-tag. */
   protected readonly touchpoint = environment.touchpoint;
-  /** Generic request state visible to the user. */
+  /** Краткое состояние операции без внутренних технических подробностей. */
   protected readonly status = signal('Выберите действие.');
-  /** Prevents duplicate submissions while a request is in flight. */
+  /** Запрещает повторный submit, пока предыдущая операция не завершилась. */
   protected readonly busy = signal(false);
 
-  /** Real local NPM facade with base64-embedded Wasm bytes. */
+  /** Локальный npm-фасад с base64-WASM; инициализация происходит при submit. */
   private readonly telemetry = new TelemetrySdk();
-  /** Submission coordinator; no real account business logic is included. */
+  /** Координатор telemetry-заголовков и HTTP-запроса. */
   private readonly demo = new ConversionDemoService(this.telemetry);
 
-  /** Generates fresh headers and sends the selected demonstration request. */
+  /**
+   * Получает свежие заголовки и отправляет выбранный login/register запрос.
+   * Исключение остаётся в console для разработчика, а шаблон получает generic status.
+   */
   protected async submit(journey: ApiJourney, email: string, password: string): Promise<void> {
     if (this.busy()) {
       return;
@@ -37,6 +43,7 @@ export class App {
       console.error('Conversion submission failed', error);
       this.status.set('Не удалось выполнить запрос.');
     } finally {
+      // Busy снимается и при успехе, и при HTTP rejection, и при исключении.
       this.busy.set(false);
     }
   }

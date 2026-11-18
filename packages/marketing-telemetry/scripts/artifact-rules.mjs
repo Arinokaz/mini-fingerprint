@@ -2,12 +2,15 @@ import assert from 'node:assert/strict';
 
 const bannedTerms = /(?:security|protection|secret|token|attack|bot|signature|authentication|authorization)/i;
 
-/** Removes long payloads before checking identifiers and comments in shipped text. */
+/** Исключает длинные base64-литералы, чтобы случайные символы payload не влияли на поиск. */
 export function withoutEmbeddedPayload(source) {
   return source.replace(/(["'])[A-Za-z0-9+/=]{512,}\1/g, '$1$1');
 }
 
-/** Rejects release hints that are unnecessary in the consumer-facing artifact. */
+/**
+ * Отклоняет комментарии, source maps и термины, раскрывающие внутреннее назначение.
+ * Проверяются JS и declarations после удаления base64-литералов.
+ */
 export function assertNeutralArtifact(source, path) {
   const text = withoutEmbeddedPayload(source);
   assert.ok(!text.includes('/*') && !text.includes('*/'), `${path}: comments must be stripped`);

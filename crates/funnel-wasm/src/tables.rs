@@ -1,6 +1,9 @@
-//! Fixed constants shared by every deterministic frame operation.
+//! Фиксированные константы всех детерминированных frame-операций.
+//!
+//! Любое изменение таблиц меняет score и требует синхронного обновления
+//! контракта, fixtures и независимой серверной реализации.
 
-/// Eight initial 32-bit lanes required by profile `cv1`.
+/// Восемь начальных 32-bit lanes профиля `cv1`.
 pub const INITIAL: [u32; 8] = [
     0x243f_6a88,
     0x85a3_08d3,
@@ -12,7 +15,7 @@ pub const INITIAL: [u32; 8] = [
     0xec4e_6c89,
 ];
 
-/// Odd multipliers used by the absorb and diffuse operations.
+/// Нечётные multipliers для absorb- и diffuse-операций.
 pub const MULTIPLIERS: [u32; 8] = [
     0x9e37_79b1,
     0x85eb_ca6b,
@@ -24,7 +27,7 @@ pub const MULTIPLIERS: [u32; 8] = [
     0xb55a_4f09,
 ];
 
-/// Additive masks applied after rotations in absorb and diffuse rounds.
+/// Additive masks, применяемые после rotations в absorb/diffuse rounds.
 pub const ADDITIVES: [u32; 8] = [
     0x7f4a_7c15,
     0x6a09_e667,
@@ -36,8 +39,8 @@ pub const ADDITIVES: [u32; 8] = [
     0x5be0_cd19,
 ];
 
-/// Cross-lane read order used in every diffuse round.
+/// Cross-lane read order каждого diffuse-раунда.
 pub const PERMUTATION: [usize; 8] = [3, 7, 1, 6, 0, 4, 2, 5];
 
-/// Sixteen substitutions applied independently to both nibbles of a byte.
+/// Шестнадцать substitutions для независимой обработки двух nibbles byte.
 pub const SUBSTITUTION: [u8; 16] = [6, 11, 3, 13, 8, 0, 15, 5, 10, 2, 12, 7, 1, 14, 4, 9];

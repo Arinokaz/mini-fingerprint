@@ -32,6 +32,8 @@
 
 Подробная карта всех исходников, generated-файлов и команд: [`docs/frontend-guide.md`](docs/frontend-guide.md).
 
+Внутреннее устройство классов, методов и Rust-модулей с аналогиями для PHP-разработчика: [`docs/php-developer-guide.md`](docs/php-developer-guide.md).
+
 Сборка WASM без повторной установки Rust на каждой машине, создание локального `.tgz`, подключение пакета к другому Angular-проекту и production-деплой: [`docs/deployment.md`](docs/deployment.md).
 
 ```text

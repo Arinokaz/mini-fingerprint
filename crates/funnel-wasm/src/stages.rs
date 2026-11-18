@@ -1,20 +1,20 @@
-//! Versioned frame stages and their integrated data-flow projections.
+//! Versioned frame-стадии и встроенные data-flow projections.
 
 use crate::frame::{add32, mul32, rotl32, sub32};
 use crate::journey::JourneyContext;
 use crate::tables::{ADDITIVES, MULTIPLIERS, PERMUTATION, SUBSTITUTION};
 use std::hint::black_box;
 
-/// One deterministic operation over the shared eight-lane frame.
+/// Одна детерминированная операция над общим восьми-lane frame.
 ///
-/// Public Rust visibility supports native integration tests. Only the neutral
-/// facade function is exported to JavaScript in the browser build.
+/// Public Rust visibility нужна native integration tests. В JavaScript
+/// экспортируется только нейтральная facade-функция из `lib.rs`.
 pub trait FunnelStage {
-    /// Mutates the frame using immutable inputs from the current journey.
+    /// Изменяет frame, используя неизменяемые входы текущего journey.
     fn apply(&self, frame: &mut [u32; 8], context: &JourneyContext);
 }
 
-/// Builds the exact `cv1` stage order consumed by native and browser callers.
+/// Создаёт точный порядок стадий `cv1` для native и browser callers.
 pub fn stages_v1() -> Vec<Box<dyn FunnelStage>> {
     vec![
         Box::new(JourneyStage),
@@ -24,7 +24,7 @@ pub fn stages_v1() -> Vec<Box<dyn FunnelStage>> {
     ]
 }
 
-/// Absorbs the absolute API path into the initial frame.
+/// Поглощает абсолютный API-путь в initial frame.
 struct JourneyStage;
 
 impl FunnelStage for JourneyStage {
@@ -34,7 +34,7 @@ impl FunnelStage for JourneyStage {
     }
 }
 
-/// Absorbs either the observed DOM tag or the unresolved fallback value.
+/// Поглощает наблюдаемый DOM tag либо unresolved fallback.
 struct TouchpointStage;
 
 impl FunnelStage for TouchpointStage {
@@ -44,7 +44,7 @@ impl FunnelStage for TouchpointStage {
     }
 }
 
-/// Absorbs length-prefixed additional properties in canonical order.
+/// Поглощает length-prefixed дополнительные свойства в каноническом порядке.
 struct PropertiesStage;
 
 impl FunnelStage for PropertiesStage {
@@ -56,7 +56,7 @@ impl FunnelStage for PropertiesStage {
     }
 }
 
-/// Absorbs both encoded words and the decoded window they represent.
+/// Поглощает encoded words и decoded window, который они представляют.
 struct PulseStage;
 
 impl FunnelStage for PulseStage {
@@ -71,8 +71,9 @@ impl FunnelStage for PulseStage {
     }
 }
 
-/// Runs the contract-defined byte absorption and the requested diffuse rounds.
+/// Выполняет contract-defined byte absorption и заданное число diffuse rounds.
 fn absorb(frame: &mut [u32; 8], domain: u8, payload: &[u8], rounds: usize) {
+    // Domain и длина обрабатываются даже при пустом payload.
     let mut data = Vec::with_capacity(5 + payload.len());
     data.push(domain);
     data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
@@ -94,14 +95,15 @@ fn absorb(frame: &mut [u32; 8], domain: u8, payload: &[u8], rounds: usize) {
     diffuse(frame, rounds);
 }
 
-/// Substitutes high and low nibbles independently through the fixed table.
+/// Заменяет high и low nibbles независимо через фиксированную таблицу.
 fn substitute(value: usize) -> u8 {
     SUBSTITUTION[value & 0x0f] | (SUBSTITUTION[(value >> 4) & 0x0f] << 4)
 }
 
-/// Computes every lane of a round from a snapshot of the preceding round.
+/// Вычисляет все lanes раунда из snapshot предыдущего раунда.
 fn diffuse(frame: &mut [u32; 8], rounds: usize) {
     for round in 0..rounds {
+        // Частично обновлённый текущий раунд не должен влиять на соседние lanes.
         let old = *frame;
         for index in 0..8 {
             let permutation = PERMUTATION[index];
@@ -116,11 +118,11 @@ fn diffuse(frame: &mut [u32; 8], rounds: usize) {
     }
 }
 
-/// Adds bounded, runtime-directed data flow inside each completed stage.
+/// Добавляет bounded runtime-directed data flow внутри завершённой стадии.
 ///
-/// The matrix controls branch selection and the drift feeds both projections.
-/// Opaque values make the extra work part of the executable data flow, while
-/// the two projection identities preserve the contract-defined stage output.
+/// Matrix управляет branch selection, drift участвует в обеих projections.
+/// Opaque values сохраняют дополнительную работу в executable data flow, а
+/// projection identities гарантируют неизменность contract-defined stage output.
 fn settle_frame(frame: &mut [u32; 8], domain: u8, rounds: usize) {
     let original = black_box(*frame);
     let mut matrix = original;
@@ -149,7 +151,7 @@ fn settle_frame(frame: &mut [u32; 8], domain: u8, rounds: usize) {
     };
 }
 
-/// Restores each original lane after a drift-dependent add/subtract projection.
+/// Восстанавливает каждую original lane после drift-dependent add/subtract.
 #[inline(never)]
 fn project_add(original: &[u32; 8], drift: &[u32; 8]) -> [u32; 8] {
     let mut output = [0_u32; 8];
@@ -160,7 +162,7 @@ fn project_add(original: &[u32; 8], drift: &[u32; 8]) -> [u32; 8] {
     output
 }
 
-/// Restores each original lane after a rotated, drift-dependent XOR projection.
+/// Восстанавливает original lanes после rotated drift-dependent XOR projection.
 #[inline(never)]
 fn project_xor(original: &[u32; 8], drift: &[u32; 8]) -> [u32; 8] {
     let mut output = [0_u32; 8];
@@ -175,6 +177,7 @@ fn project_xor(original: &[u32; 8], drift: &[u32; 8]) -> [u32; 8] {
 mod tests {
     use super::{project_add, project_xor, settle_frame};
 
+    /// Создаёт детерминированные lanes для property-проверок эквивалентности.
     fn generated_frame(mut seed: u32) -> [u32; 8] {
         let mut frame = [0_u32; 8];
         for lane in &mut frame {

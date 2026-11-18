@@ -1,5 +1,5 @@
-/** Staging values kept separate from local and production build markers. */
+/** Отдельный staging marker, не смешиваемый с local/production конфигурацией. */
 export const environment = {
-    /** Marker expected by a future staging PHP configuration. */
+  /** Значение, которое должна ожидать будущая staging PHP-проверка. */
   touchpoint: 'staging-build-tag',
 };

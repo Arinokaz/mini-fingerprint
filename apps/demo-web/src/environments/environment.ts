@@ -1,5 +1,5 @@
-/** Production-like defaults replaced explicitly for local development/staging. */
+/** Production-значения по умолчанию; development/staging заменяются при сборке. */
 export const environment = {
-    /** Expected DOM value for this build; PHP configuration is set independently. */
+  /** Ожидаемый DOM marker; будущая PHP-конфигурация задаётся независимо. */
   touchpoint: 'production-build-tag',
 };

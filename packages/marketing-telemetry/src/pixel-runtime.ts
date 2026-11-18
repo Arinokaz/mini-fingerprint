@@ -2,14 +2,22 @@ import initialize, { calculate_funnel_score } from '../pkg/funnel_wasm.js';
 import { PIXEL_BASE64 } from './generated-pixel.js';
 import type { PixelRuntime } from './types.js';
 
-/** Initializes the generated module from the base64 payload embedded in NPM. */
+/**
+ * Инициализирует WebAssembly из base64, встроенного в npm-пакет.
+ *
+ * Generated glue и base64 импортируются именно в этом модуле, чтобы сборщик
+ * мог либо встроить их в index.js, либо вынести в lazy chunk целиком.
+ */
 export async function instantiatePixelRuntime(): Promise<PixelRuntime> {
-  // A BufferSource input prevents wasm-bindgen from calling fetch for a Wasm URL.
+  // BufferSource не является URL, поэтому wasm-bindgen не вызывает fetch.
   await initialize({ module_or_path: decodeBase64(PIXEL_BASE64) });
   return { calculate_funnel_score };
 }
 
-/** Converts the ASCII base64 payload into bytes accepted by WebAssembly. */
+/**
+ * Преобразует ASCII base64 в байты, принимаемые WebAssembly.instantiate.
+ * Результат является бинарным представлением модуля, а не расшифровкой.
+ */
 function decodeBase64(value: string): Uint8Array {
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);

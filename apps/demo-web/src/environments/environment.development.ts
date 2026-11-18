@@ -1,5 +1,5 @@
-/** Local values matching the documented development fixture. */
+/** Локальные значения, соответствующие development fixture. */
 export const environment = {
-    /** Local marker used by the Angular template and future PHP configuration. */
+  /** Marker Angular-шаблона и будущей независимой PHP-конфигурации. */
   touchpoint: 'dsf3fdfgdfg',
 };

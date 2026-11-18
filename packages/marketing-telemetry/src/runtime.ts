@@ -1,27 +1,37 @@
 import type { PixelRuntime, RuntimeLoader } from './types.js';
 
-/** Loads the generated module only when the first conversion is requested. */
+/**
+ * Загружает вычислительный модуль только при первом обращении к runtime.
+ *
+ * Этот dynamic import является общей точкой двух вариантов сборки: embedded
+ * встраивает модуль в основной JS, а lazy выносит его в отдельный JS chunk.
+ */
 export const loadPixelRuntime: RuntimeLoader = async () => {
   const pixel = await import('./pixel-runtime.js');
   return pixel.instantiatePixelRuntime();
 };
 
-/** Coordinates lazy initialization for all consumers of the embedded module. */
+/** Координирует lazy-инициализацию в пределах одного экземпляра TelemetrySdk. */
 export class RuntimeGate {
-  /** Shared fulfilled or in-flight initialization; cleared after rejection. */
+  /**
+   * Общий Promise текущей или завершённой инициализации.
+   * После rejection поле очищается, чтобы следующая попытка могла повторить загрузку.
+   */
   private pending?: Promise<PixelRuntime>;
 
-  /** Stores the replaceable external loading boundary. */
+  /** Сохраняет внешнюю границу загрузки; подмена loader используется в тестах. */
   constructor(private readonly loader: RuntimeLoader = loadPixelRuntime) {}
 
   /**
-   * Returns the same promise for concurrent callers.
+   * Возвращает runtime, не создавая параллельных инициализаций.
    *
-   * A rejection clears the shared state so a later submission can retry.
+   * Все одновременные вызовы получают один и тот же Promise. Ошибка не
+   * блокирует повтор навсегда: следующий вызов запускает новую попытку.
    */
   acquire(): Promise<PixelRuntime> {
     if (this.pending === undefined) {
       const attempt = this.loader().catch((error: unknown) => {
+        // Старый rejection не должен очистить Promise более новой попытки.
         if (this.pending === attempt) {
           this.pending = undefined;
         }

@@ -1,0 +1,244 @@
+# TypeScript npm-пакет `@company/marketing-telemetry`
+
+Пакет находится в `packages/marketing-telemetry`. Он связывает Angular с Rust/WASM, но сам не содержит Angular-зависимостей. Его можно использовать из браузерного TypeScript/JavaScript через нейтральный telemetry API.
+
+## 1. Карта файлов
+
+| Файл | Ответственность |
+|---|---|
+| `src/index.ts` | Публичная точка входа пакета |
+| `src/conversion.ts` | `TelemetrySdk`, проверка ответа WASM, формирование заголовков |
+| `src/runtime.ts` | Lazy-загрузка runtime и `RuntimeGate` |
+| `src/pixel-runtime.ts` | Base64 decode и конкретная инициализация WASM |
+| `src/types.ts` | TypeScript-контракты runtime и ответа |
+| `src/settings.ts` | Названия заголовков и статическое telemetry-значение |
+| `src/generated-pixel.ts` | **Generated:** base64-WASM, не редактировать вручную |
+| `scripts/build.mjs` | Declarations + минифицированный embedded/lazy JS |
+| `scripts/release.mjs` | Staging, два `.tgz`, size report |
+| `scripts/artifact-rules.mjs` | Проверка comments/source maps/терминов |
+
+## 2. Публичная точка входа `src/index.ts`
+
+Наружу экспортируются:
+
+```typescript
+export { TelemetrySdk } from './conversion.js';
+export type { RuntimeLoader } from './types.js';
+```
+
+Это ограничивает поверхность пакета. Angular не импортирует Rust, generated glue или внутренние helper-функции напрямую.
+
+Расширение `.js` в импорте TypeScript-исходника намеренное: после компиляции оно соответствует ESM-файлу, который получит потребитель.
+
+## 3. Класс `TelemetrySdk` — `src/conversion.ts`
+
+### Назначение
+
+Даёт приложению один метод для получения telemetry-заголовков и скрывает детали инициализации/вызова WASM.
+
+### Создание
+
+```typescript
+const telemetry = new TelemetrySdk();
+```
+
+Конструктор имеет необязательный параметр `loader: RuntimeLoader = loadPixelRuntime`. Он создаёт `RuntimeGate`, но сам по себе WASM не инициализирует.
+
+Параметр `loader` прежде всего нужен TypeScript-тестам для подстановки контролируемого runtime. В обычном Angular-приложении его передавать не требуется.
+
+### Метод `getConversionHeaders`
+
+```typescript
+async getConversionHeaders(
+  actionPath: string,
+  properties: Record<string, string> = {},
+): Promise<Record<string, string>>
+```
+
+**Вход:**
+
+- `actionPath` — API-путь, например `/api/auth/login`;
+- `properties` — дополнительные строковые свойства; по умолчанию пустой объект.
+
+**Результат:** Promise с пятью заголовками, перечисленными в [`../architecture.md`](../architecture.md#3-что-возвращает-npm-пакет).
+
+**Основная логика:**
+
+1. `Object.entries(properties)` превращает объект в массив пар и сохраняет порядок вставки.
+2. `this.runtime.acquire()` получает уже инициализированный runtime или запускает инициализацию.
+3. `calculate_funnel_score(actionPath, JSON.stringify(inputPairs))` вызывает Rust.
+4. `readPayload()` разбирает и проверяет JSON-ответ.
+5. Свойства повторно сериализуются из проверенного `payload.properties` и кодируются base64url.
+6. Метод возвращает все заголовки.
+
+**Side effects:** при первом вызове может загрузиться lazy chunk, декодируется WASM, Rust читает DOM и текущее время.
+
+**Ошибки:** ошибки загрузки/инициализации и некорректный ответ runtime не превращаются в частичные заголовки; Promise отклоняется.
+
+**Инварианты:** нельзя независимо менять названия заголовков, формат `properties`, ожидаемый `profile=cv1` или порядок вычислений. Для этого нужны синхронные изменения контракта, backend и тестов.
+
+## 4. Внутренние функции `conversion.ts`
+
+### `readPayload(raw: string): ConversionPayload`
+
+Разбирает строку через `JSON.parse`, затем вызывает `isPayload`.
+
+- Некорректный JSON → `Invalid runtime response: malformed JSON`.
+- JSON неправильной формы → `Invalid runtime response: inconsistent fields`.
+
+Функция не доверяет данным только потому, что они пришли из WASM: TypeScript проверяет границу перед созданием заголовков.
+
+### `isPayload(candidate: unknown): candidate is ConversionPayload`
+
+Type guard — функция, которая проверяет значение и уточняет его TypeScript-тип.
+
+Требует:
+
+- объект;
+- `profile === 'cv1'`;
+- `pulse` из 16 строчных hex-символов;
+- `score` из 64 строчных hex-символов;
+- массив `properties`, каждый элемент которого проходит `isProperty`.
+
+### `isProperty(candidate: unknown)`
+
+Проверяет кортеж ровно из двух строк `[name, value]`. Это структурная проверка ответа WASM; правила допустимых имён/значений определяются Rust и контрактом.
+
+### `encodeBase64Url(value: string): string`
+
+1. `TextEncoder` превращает UTF-8 строку в bytes.
+2. Bytes преобразуются в binary string для `btoa`.
+3. `+` заменяется на `-`, `/` на `_`.
+4. Завершающие `=` удаляются.
+
+Это base64url без padding, а не шифрование.
+
+## 5. `src/runtime.ts`
+
+### `loadPixelRuntime: RuntimeLoader`
+
+Асинхронный loader без аргументов:
+
+```typescript
+const pixel = await import('./pixel-runtime.js');
+return pixel.instantiatePixelRuntime();
+```
+
+Dynamic import — единая точка, которую сборщик превращает в:
+
+- встроенный код для `embedded`;
+- отдельный `pixel.<hash>.js` для `lazy`.
+
+### Класс `RuntimeGate`
+
+Внутренний координатор инициализации. Он не экспортируется из публичного `src/index.ts`.
+
+#### Поле `pending?: Promise<PixelRuntime>`
+
+Хранит текущий или завершённый Promise. Пока runtime не запрошен, поле отсутствует.
+
+#### `constructor(loader: RuntimeLoader = loadPixelRuntime)`
+
+Сохраняет loader. Позволяет тестам проверять логику без настоящего WASM.
+
+#### `acquire(): Promise<PixelRuntime>`
+
+- Если `pending` отсутствует, вызывает loader и сохраняет Promise.
+- Все последующие/concurrent-вызовы получают тот же Promise.
+- При rejection Promise очищается только если он всё ещё является текущей попыткой.
+- Следующий вызов после ошибки может повторить загрузку.
+
+Это предотвращает повторную инициализацию WASM и параллельную загрузку одного lazy chunk несколькими submit-вызовами.
+
+## 6. `src/pixel-runtime.ts`
+
+### `instantiatePixelRuntime(): Promise<PixelRuntime>`
+
+Статически импортирует generated glue и `PIXEL_BASE64` внутри lazy/embedded вычислительного модуля.
+
+**Логика:**
+
+1. `decodeBase64(PIXEL_BASE64)` создаёт `Uint8Array`.
+2. `initialize({ module_or_path: bytes })` инициализирует wasm-bindgen.
+3. Возвращает объект с методом `calculate_funnel_score`.
+
+Передача bytes важна: wasm-bindgen не получает URL и поэтому не выполняет `fetch` за `.wasm`.
+
+### `decodeBase64(value: string): Uint8Array`
+
+- `atob` декодирует ASCII base64 в binary string;
+- функция выделяет `Uint8Array` той же длины;
+- `charCodeAt` последовательно записывает байты.
+
+## 7. Типы — `src/types.ts`
+
+| Тип | Значение |
+|---|---|
+| `PixelRuntime` | Объект с `calculate_funnel_score(journey, propertiesJson): string` |
+| `RuntimeLoader` | `() => Promise<PixelRuntime>` |
+| `ConversionProperty` | Кортеж `[name: string, value: string]` |
+| `ConversionPayload` | Ответ Rust: `profile`, `pulse`, `score`, `properties` |
+
+`ConversionPayload` описывает ожидаемую форму, а runtime-проверки в `conversion.ts` доказывают её фактически.
+
+## 8. Настройки — `src/settings.ts`
+
+Централизует пять названий заголовков и `COUNTER_CLIENT = 'v2.10.4-pixel'`. При переименовании заголовка нужно менять не только эту константу, но и серверную проверку, CORS allowlist и тесты.
+
+## 9. Generated base64 — `src/generated-pixel.ts`
+
+Создаётся `scripts/build-wasm.mjs` из `pkg/pixel.wasm`:
+
+```typescript
+export const PIXEL_BASE64: string = '...';
+```
+
+Явный `: string` важен: TypeScript declaration должен содержать только тип, а не дублировать весь base64-литерал в `.d.ts`.
+
+Файл generated, не редактируется вручную. Его байты и `pkg/` должны происходить из одной WASM-сборки.
+
+## 10. Build/release scripts
+
+### `scripts/build.mjs`
+
+Аргументы:
+
+```text
+--variant embedded|lazy
+--out-dir <каталог внутри репозитория>
+```
+
+1. Очищает только указанный generated output.
+2. Запускает TypeScript `--emitDeclarationOnly`.
+3. Использует esbuild: browser ESM, ES2022, bundle, minify, no legal comments, no source maps.
+4. В lazy включает splitting и `chunkNames=pixel-[hash]`.
+5. Проверяет JS/declarations через artifact rules.
+
+Обычный `npm run build --workspace @company/marketing-telemetry` создаёт embedded `dist/` для workspace demo.
+
+### `scripts/release.mjs`
+
+1. Создаёт отдельные `release/staging/embedded` и `release/staging/lazy`.
+2. Вызывает build script для каждого варианта.
+3. Создаёт упрощённый package manifest без devDependencies/scripts.
+4. Выполняет `npm pack` и добавляет variant suffix к имени архива.
+5. Считает raw WASM/base64 и JS/gzip sizes в `release/size-report.json`.
+
+Архивы не содержат одновременно оба варианта.
+
+### `scripts/artifact-rules.mjs`
+
+- `withoutEmbeddedPayload()` исключает длинные base64-литералы перед текстовым сканированием.
+- `assertNeutralArtifact()` запрещает comments, `sourceMappingURL` и термины `security`, `protection`, `secret`, `token`, `attack`, `bot`, `signature`, `authentication`, `authorization` без учёта регистра, включая вхождения в camelCase.
+
+## 11. Связанные тесты
+
+| Тест | Что доказывает |
+|---|---|
+| `tests/conversion.test.ts` | Аргументы, пустые свойства, concurrent initialization, отклонение malformed payload |
+| `tests/runtime.test.ts` | Lazy start, shared Promise, retry после ошибки |
+| `tests/pixel.integration.test.ts` | Реальный WASM, golden headers, determinism, отсутствие `fetch` |
+| `tests/package-contents.test.ts` | Минимизированный embedded package contract |
+| `tests/release.test.ts` | Два архива, единственный payload, scanner, sizes, одинаковые golden headers обоих вариантов |
+
+При изменении логики нужно сохранять соответствующие проверки или осознанно обновлять их вместе с контрактом.

@@ -1,19 +1,19 @@
-//! Validation and owned data associated with the requested API journey.
+//! Проверка API-пути и owned-данные одного conversion-вызова.
 
 use crate::codec::CanonicalProperties;
 use crate::pulse::encode_pulse;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-/// Explains why an input cannot be used as an API journey.
+/// Описывает причину, по которой вход нельзя использовать как API journey.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JourneyError {
-    /// Human-readable validation detail for maintainers and tests.
+    /// Человекочитаемая деталь для сопровождения и тестов.
     message: String,
 }
 
 impl JourneyError {
-    /// Creates a validation error without exposing a browser-specific error type.
+    /// Создаёт validation error без привязки к browser-specific error type.
     fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
@@ -29,10 +29,10 @@ impl Display for JourneyError {
 
 impl Error for JourneyError {}
 
-/// Checks the path shape shared by the browser and the PHP mirror.
+/// Проверяет форму пути, общую для браузерной реализации и будущего PHP mirror.
 ///
-/// Only an absolute path is accepted. Query strings and fragments are excluded
-/// so the same value can be derived from the active server route.
+/// Принимается только абсолютный путь. Query и fragment исключаются, чтобы
+/// сервер мог однозначно получить то же значение из активного маршрута.
 pub fn validate_journey(journey: &str) -> Result<(), JourneyError> {
     let byte_length = journey.len();
     if byte_length == 0 || byte_length > 512 {
@@ -54,23 +54,23 @@ pub fn validate_journey(journey: &str) -> Result<(), JourneyError> {
     Ok(())
 }
 
-/// Owned inputs shared by every stage of one conversion run.
+/// Owned-входы, совместно используемые всеми стадиями одного вычисления.
 #[derive(Debug, Clone)]
 pub struct JourneyContext {
-    /// Absolute API path supplied by the Angular facade.
+    /// Абсолютный API-путь, полученный от Angular-фасада.
     journey: String,
-    /// Valid DOM marker or the deterministic unresolved fallback.
+    /// Действительный DOM marker либо детерминированный unresolved fallback.
     touchpoint: String,
-    /// Additional properties already validated and placed in canonical order.
+    /// Проверенные дополнительные свойства в каноническом порядке.
     properties: CanonicalProperties,
-    /// Temporal window selected inside the Wasm module.
+    /// Временное окно, выбранное внутри WASM.
     selected_window: u64,
-    /// Reversible representation mixed into the final stage and sent to PHP.
+    /// Обратимое представление для последней стадии и HTTP-заголовка.
     pulse: (u32, u32),
 }
 
 impl JourneyContext {
-    /// Validates environment-derived strings and precomputes the encoded pulse.
+    /// Проверяет environment-строки и заранее вычисляет encoded pulse.
     pub fn new(
         journey: &str,
         touchpoint: &str,
@@ -92,27 +92,27 @@ impl JourneyContext {
         })
     }
 
-    /// Returns the absolute API path consumed by the journey stage.
+    /// Возвращает абсолютный API-путь для journey-стадии.
     pub fn journey(&self) -> &str {
         &self.journey
     }
 
-    /// Returns the selected DOM value consumed by the touchpoint stage.
+    /// Возвращает выбранный DOM marker для touchpoint-стадии.
     pub fn touchpoint(&self) -> &str {
         &self.touchpoint
     }
 
-    /// Returns canonical additional properties consumed by the property stage.
+    /// Возвращает канонические свойства для property-стадии.
     pub fn properties(&self) -> &CanonicalProperties {
         &self.properties
     }
 
-    /// Returns the decoded window used in the pulse payload.
+    /// Возвращает decoded window, используемый в pulse payload.
     pub fn selected_window(&self) -> u64 {
         self.selected_window
     }
 
-    /// Returns the encoded words used in the pulse payload and HTTP header.
+    /// Возвращает encoded words для pulse payload и HTTP-заголовка.
     pub fn pulse(&self) -> (u32, u32) {
         self.pulse
     }

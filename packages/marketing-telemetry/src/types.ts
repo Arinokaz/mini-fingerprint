@@ -1,23 +1,23 @@
-/** Minimal generated Wasm surface consumed by the TypeScript facade. */
+/** Минимальная поверхность generated WASM, необходимая TypeScript-фасаду. */
 export interface PixelRuntime {
-  /** Executes the neutral Rust export and returns its JSON payload. */
+  /** Выполняет вычисление cv1 и возвращает результат в виде JSON-строки. */
   calculate_funnel_score(journey: string, propertiesJson: string): string;
 }
 
-/** Asynchronous boundary that initializes the embedded module without input. */
+/** Асинхронная граница, которая загружает и инициализирует runtime без аргументов. */
 export type RuntimeLoader = () => Promise<PixelRuntime>;
 
-/** Canonical string pair returned by the Rust property codec. */
+/** Каноническая пара дополнительного свойства: имя и строковое значение. */
 export type ConversionProperty = [name: string, value: string];
 
-/** Shape of the JSON payload returned from the Wasm entry point. */
+/** Ожидаемая форма JSON, который TypeScript получает от WASM. */
 export interface ConversionPayload {
-  /** Version of the active conversion pipeline. */
+  /** Версия conversion-контракта; текущая реализация использует `cv1`. */
   profile: string;
-  /** Reversible encoded temporal window. */
+  /** Обратимое представление выбранного временного окна. */
   pulse: string;
-  /** Sixty-four-character result forwarded unchanged to the server. */
+  /** Итоговые 64 hex-символа, передаваемые в заголовке без изменений. */
   score: string;
-  /** Canonical property pairs serialized into the telemetry header. */
+  /** Проверенные и канонически отсортированные пары свойств. */
   properties: ConversionProperty[];
 }

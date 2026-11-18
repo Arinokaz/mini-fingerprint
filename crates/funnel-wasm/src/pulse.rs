@@ -1,21 +1,21 @@
-//! Reversible temporal-window encoding and client boundary selection.
+//! Обратимое кодирование временного окна и клиентский boundary buffer.
 
 use crate::frame::{add32, rotl32, sub32};
 
-/// Width of one accepted temporal interval in seconds.
+/// Длительность одного временного интервала в секундах.
 const INTERVAL_SECONDS: u64 = 180;
-/// Client switches to the next interval strictly inside this boundary.
+/// Внутри этой границы клиент переключается на следующий интервал.
 const BOUNDARY_SECONDS: u64 = 15;
-/// First XOR mask applied to the low temporal word.
+/// Первая XOR-маска младшего временного слова.
 const KEY_0: u32 = 0xa53c_9e17;
-/// Second XOR mask applied to the high temporal word.
+/// Вторая XOR-маска старшего временного слова.
 const KEY_1: u32 = 0x6d2b_79f5;
-/// Output whitening mask for the first encoded word.
+/// Output-маска первого encoded word.
 const ADD_0: u32 = 0x9e37_79b9;
-/// Output whitening mask for the second encoded word.
+/// Output-маска второго encoded word.
 const ADD_1: u32 = 0x7f4a_7c15;
 
-/// Chooses the current or next 180-second window using the 15-second buffer.
+/// Выбирает текущее или следующее 180-секундное окно с 15-секундным буфером.
 pub const fn select_window(now_seconds: u64) -> u64 {
     let current = (now_seconds / INTERVAL_SECONDS) * INTERVAL_SECONDS;
     let end = current + INTERVAL_SECONDS;
@@ -26,7 +26,7 @@ pub const fn select_window(now_seconds: u64) -> u64 {
     }
 }
 
-/// Encodes a 64-bit window with two reversible fixed-width Feistel rounds.
+/// Кодирует 64-bit window двумя обратимыми fixed-width Feistel-раундами.
 pub const fn encode_pulse(window: u64) -> (u32, u32) {
     let a = (window as u32) ^ KEY_0;
     let b = ((window >> 32) as u32) ^ KEY_1;
@@ -37,7 +37,7 @@ pub const fn encode_pulse(window: u64) -> (u32, u32) {
     (e ^ ADD_0, f ^ ADD_1)
 }
 
-/// Restores the original 64-bit window by applying inverse steps in reverse.
+/// Восстанавливает исходное 64-bit window обратными шагами в обратном порядке.
 pub const fn decode_pulse(parts: (u32, u32)) -> u64 {
     let e = parts.0 ^ ADD_0;
     let f = parts.1 ^ ADD_1;
@@ -50,7 +50,7 @@ pub const fn decode_pulse(parts: (u32, u32)) -> u64 {
     (low as u64) | ((high as u64) << 32)
 }
 
-/// Serializes two encoded words as 16 lowercase hexadecimal characters.
+/// Сериализует два encoded words как 16 строчных hex-символов.
 pub fn pulse_to_hex(parts: (u32, u32)) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(16);

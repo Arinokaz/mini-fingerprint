@@ -1,3 +1,7 @@
+/**
+ * Собирает declarations и минифицированный browser ESM для одного варианта пакета.
+ * Скрипт не компилирует Rust: generated pkg/ и generated-pixel.ts уже должны существовать.
+ */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
@@ -25,6 +29,7 @@ if (variant !== 'embedded' && variant !== 'lazy') {
   throw new Error(`Unsupported package variant: ${variant}`);
 }
 const outDir = resolve(packageRoot, outDirOption);
+// Очистка разрешена только для generated-каталогов внутри текущего репозитория.
 const relativeOutput = relative(repositoryRoot, outDir);
 if (relativeOutput === '' || relativeOutput.startsWith('..') || isAbsolute(relativeOutput)) {
   throw new Error('Package output must stay inside the repository.');
@@ -32,6 +37,7 @@ if (relativeOutput === '' || relativeOutput.startsWith('..') || isAbsolute(relat
 
 rmSync(outDir, { recursive: true, force: true });
 await mkdir(outDir, { recursive: true });
+// TypeScript создаёт только declarations; рабочий JS далее собирает esbuild.
 const declarations = spawnSync('tsc', [
   '-p', resolve(packageRoot, 'tsconfig.json'),
   '--emitDeclarationOnly',
@@ -56,6 +62,7 @@ const options = {
   sourcemap: false,
 };
 if (variant === 'lazy') {
+  // Dynamic import pixel-runtime становится единственным content-hashed chunk.
   await build({
     ...options,
     outdir: outDir,

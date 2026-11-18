@@ -1,12 +1,13 @@
-//! DOM touchpoint discovery with a deterministic unresolved fallback.
+//! Поиск DOM touchpoint с детерминированным unresolved fallback.
 
-/// Value mixed when exactly one usable DOM marker cannot be found.
+/// Значение, используемое при отсутствии ровно одного пригодного DOM marker.
 pub const FALLBACK_TOUCHPOINT: &str = "telemetry.unresolved.v1";
 
-/// Chooses a tag only when the candidate list contains one usable value.
+/// Выбирает tag только при наличии одного пригодного candidate.
 ///
-/// Empty, missing, duplicate and oversized markers all follow the same path,
-/// allowing browser execution to continue without exposing a DOM exception.
+/// Empty, missing, duplicate и oversized markers используют один путь fallback.
+/// Браузерное вычисление продолжается без DOM-исключения, но будущая demo
+/// PHP-проверка обязана отклонять fallback-результат вместо ожидаемого tag.
 pub fn choose_touchpoint(candidates: &[Option<String>]) -> String {
     match candidates {
         [Some(value)] if !value.is_empty() && value.len() <= 256 => value.clone(),
@@ -14,7 +15,7 @@ pub fn choose_touchpoint(candidates: &[Option<String>]) -> String {
     }
 }
 
-/// Reads `span.telemetrics_click[data-tag]` from the active browser document.
+/// Читает `span.telemetrics_click[data-tag]` из активного browser document.
 #[cfg(target_arch = "wasm32")]
 pub fn current_touchpoint() -> String {
     use wasm_bindgen::JsCast;
@@ -41,7 +42,7 @@ pub fn current_touchpoint() -> String {
     choose_touchpoint(&candidates)
 }
 
-/// Native fallback keeps non-browser tests independent from a JavaScript host.
+/// Native fallback позволяет тестам работать без JavaScript host.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn current_touchpoint() -> String {
     FALLBACK_TOUCHPOINT.to_owned()

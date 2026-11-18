@@ -1,3 +1,7 @@
+/**
+ * Создаёт независимые embedded/lazy npm-архивы из общих исходников.
+ * Staging и size report остаются служебными файлами и не входят в архивы.
+ */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
@@ -12,6 +16,7 @@ const stagingRoot = resolve(releaseRoot, 'staging');
 const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8'));
 const baseName = `company-marketing-telemetry-${manifest.version}`;
 
+/** Запускает внешнюю команду и прекращает выпуск при любой ошибке. */
 function run(command, args) {
   const result = spawnSync(command, args, {
     cwd: repositoryRoot,
@@ -27,6 +32,7 @@ function run(command, args) {
   return result.stdout;
 }
 
+/** Возвращает фактический и gzip-размер файла без наложения произвольного лимита. */
 function fileSize(path) {
   const bytes = readFileSync(path);
   return {
@@ -44,6 +50,7 @@ const report = {
   variants: {},
 };
 
+// Каждый вариант имеет собственный staging, чтобы архив не содержал два payload.
 for (const variant of ['embedded', 'lazy']) {
   const staging = resolve(stagingRoot, variant);
   const outDir = resolve(staging, 'dist');

@@ -1,32 +1,38 @@
-/** API paths supported by the one-page demonstration. */
+/** Два API-пути, поддерживаемые демонстрационной страницей. */
 export type ApiJourney = '/api/auth/login' | '/api/auth/register';
 
-/** Structural subset of the local telemetry package used by this service. */
+/** Минимальный telemetry-контракт, необходимый сервису отправки. */
 export interface ConversionClient {
-  /** Generates headers just before the request is sent. */
+  /** Получает заголовки непосредственно перед соответствующим запросом. */
   getConversionHeaders(
     actionPath: string,
     properties?: Record<string, string>,
   ): Promise<Record<string, string>>;
 }
 
-/** User-safe result shown by the Angular component. */
+/** Безопасный для шаблона результат без тела и внутренних деталей ответа. */
 export interface SubmissionResult {
-  /** HTTP status returned by the demonstration endpoint. */
+  /** HTTP status, полученный от demo endpoint. */
   status: number;
-  /** Generic message that does not expose internal rejection details. */
+  /** Generic сообщение, одинаково не раскрывающее причину отклонения. */
   message: string;
 }
 
-/** Coordinates telemetry generation and the subsequent JSON request. */
+/**
+ * Координирует вычисление telemetry и отправку JSON.
+ * Не хранит credentials и не реализует серверную проверку.
+ */
 export class ConversionDemoService {
-  /** Stores the real facade and replaceable network boundary. */
+  /**
+   * Принимает минимальный client и сетевую границу.
+   * Default wrapper сохраняет globalThis как receiver браузерного fetch.
+   */
   constructor(
     private readonly conversions: ConversionClient,
     private readonly fetcher: typeof fetch = (input, init) => globalThis.fetch(input, init),
   ) {}
 
-  /** Sends one demonstration request without persisting credentials. */
+  /** Формирует свежие заголовки и сразу отправляет login/register POST. */
   async submit(journey: ApiJourney, email: string, password: string): Promise<SubmissionResult> {
     const actionName = journey.endsWith('/register') ? 'register' : 'login';
     const conversionHeaders = await this.conversions.getConversionHeaders(journey, {

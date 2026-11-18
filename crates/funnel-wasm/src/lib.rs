@@ -1,4 +1,4 @@
-//! Pure conversion primitives used by the browser-facing telemetry facade.
+//! Чистые conversion-примитивы, используемые браузерным telemetry-фасадом.
 
 pub mod codec;
 pub mod frame;
@@ -8,10 +8,10 @@ pub mod stages;
 pub mod tables;
 pub mod touchpoint;
 
-/// Produces the current conversion measurement entirely inside the browser module.
+/// Выполняет текущее conversion-вычисление полностью внутри браузерного модуля.
 ///
-/// The facade supplies only an API path and additional properties. Time and DOM
-/// state are collected here so TypeScript never supplies a trusted timestamp.
+/// Фасад передаёт только API-путь и дополнительные свойства. Время и DOM
+/// получаются здесь, поэтому TypeScript не предоставляет доверенный timestamp.
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn calculate_funnel_score(
@@ -41,6 +41,7 @@ pub fn calculate_funnel_score(
 
     let mut frame = Frame::from_journey(context.journey())
         .map_err(|_| JsValue::from_str("unsupported conversion journey"))?;
+    // Порядок стадий является частью контракта cv1 и не должен меняться независимо.
     for stage in stages_v1() {
         stage.apply(frame.lanes_mut(), &context);
     }

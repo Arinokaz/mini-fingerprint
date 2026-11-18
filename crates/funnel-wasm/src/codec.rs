@@ -1,30 +1,30 @@
-//! Strict parsing and canonical encoding for additional telemetry properties.
+//! Строгий parsing и каноническое кодирование дополнительных telemetry-свойств.
 
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt::{Display, Formatter, Write};
 
-/// Maximum accepted JSON payload size in bytes.
+/// Максимальный размер входного JSON payload в байтах.
 const MAX_JSON_BYTES: usize = 4096;
-/// Maximum number of `[name, value]` pairs.
+/// Максимальное количество пар `[name, value]`.
 const MAX_PROPERTIES: usize = 32;
-/// Maximum ASCII property-name length.
+/// Максимальная длина ASCII property name.
 const MAX_NAME_BYTES: usize = 64;
-/// Maximum UTF-8 property-value length.
+/// Максимальная UTF-8 длина property value.
 const MAX_VALUE_BYTES: usize = 512;
-/// Names reserved for context supplied outside the additional-property bag.
+/// Имена, зарезервированные для контекста вне дополнительного property bag.
 const RESERVED_NAMES: [&str; 4] = ["sys.journey", "sys.touchpoint", "sys.pulse", "sys.profile"];
 
-/// Describes a malformed property payload without panicking in Wasm.
+/// Описывает malformed property payload без panic в WASM.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PropertyError {
-    /// Validation detail intended for logs and developer-facing tests.
+    /// Validation detail для логов и developer-facing tests.
     message: String,
 }
 
 impl PropertyError {
-    /// Builds an error with a stable, specific validation message.
+    /// Создаёт ошибку со стабильным конкретным сообщением.
     fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
@@ -40,15 +40,15 @@ impl Display for PropertyError {
 
 impl Error for PropertyError {}
 
-/// Owned, validated properties kept in canonical name order.
+/// Owned и проверенные свойства, хранящиеся в каноническом порядке имён.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CanonicalProperties {
-    /// Sorted pairs; ownership prevents borrowed JSON lifetimes crossing Wasm calls.
+    /// Сортированные pairs; owned strings не связывают WASM-вызов JSON lifetimes.
     pairs: Vec<(String, String)>,
 }
 
 impl CanonicalProperties {
-    /// Parses a JSON pair array, validates every item and sorts it by name.
+    /// Разбирает JSON pair array, проверяет каждый item и сортирует по имени.
     pub fn parse(input: &str) -> Result<Self, PropertyError> {
         if input.len() > MAX_JSON_BYTES {
             return Err(PropertyError::new("property JSON exceeds 4096 bytes"));
@@ -87,11 +87,12 @@ impl CanonicalProperties {
             pairs.push((name.to_owned(), value.to_owned()));
         }
 
+        // Сортировка устраняет влияние исходного порядка пар на результат.
         pairs.sort_by(|left, right| left.0.as_bytes().cmp(right.0.as_bytes()));
         Ok(Self { pairs })
     }
 
-    /// Returns compact canonical JSON with deterministic escaping and UTF-8.
+    /// Возвращает compact canonical JSON с детерминированным escaping и UTF-8.
     pub fn canonical_json(&self) -> String {
         let mut output = String::from("[");
         for (index, (name, value)) in self.pairs.iter().enumerate() {
@@ -108,7 +109,7 @@ impl CanonicalProperties {
         output
     }
 
-    /// Appends length-prefixed names and values in canonical order.
+    /// Добавляет length-prefixed names/values в каноническом порядке.
     pub fn write_bytes(&self, output: &mut Vec<u8>) {
         for (name, value) in &self.pairs {
             append_length_prefixed(output, name.as_bytes());
@@ -117,7 +118,7 @@ impl CanonicalProperties {
     }
 }
 
-/// Validates the restricted ASCII name grammar and reserved namespace.
+/// Проверяет restricted ASCII grammar имени и reserved namespace.
 fn validate_name(name: &str) -> Result<(), PropertyError> {
     if name.is_empty() || name.len() > MAX_NAME_BYTES {
         return Err(PropertyError::new(
@@ -137,13 +138,13 @@ fn validate_name(name: &str) -> Result<(), PropertyError> {
     Ok(())
 }
 
-/// Appends a 32-bit little-endian byte length followed by the original bytes.
+/// Добавляет 32-bit little-endian byte length и затем исходные bytes.
 fn append_length_prefixed(output: &mut Vec<u8>, bytes: &[u8]) {
     output.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
     output.extend_from_slice(bytes);
 }
 
-/// Writes one JSON string without escaping non-ASCII text or the solidus.
+/// Записывает JSON string без escaping non-ASCII текста или solidus.
 fn write_json_string(output: &mut String, value: &str) {
     output.push('"');
     for character in value.chars() {

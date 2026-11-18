@@ -14,22 +14,37 @@ import type {
   RuntimeLoader,
 } from './types.js';
 
-/** Public marketing-style facade hiding browser and Wasm integration details. */
+/**
+ * Публичный marketing-style фасад, скрывающий браузерную и WASM-интеграцию.
+ *
+ * Экземпляр хранит собственный RuntimeGate: повторная инициализация исключается
+ * в пределах этого экземпляра, а не глобально для всего приложения.
+ */
 export class TelemetrySdk {
-  /** Lazy initializer shared by every submission made through this instance. */
+  /** Общий lazy initializer для всех запросов через этот экземпляр фасада. */
   private readonly runtime: RuntimeGate;
 
-  /** Creates an embedded-runtime facade; the optional loader supports TS tests. */
+  /**
+   * Создаёт фасад со встроенным runtime.
+   * Необязательный loader предназначен прежде всего для подстановки в тестах.
+   */
   constructor(loader: RuntimeLoader = loadPixelRuntime) {
     this.runtime = new RuntimeGate(loader);
   }
 
-  /** Generates camouflaged headers immediately before an API submission. */
+  /**
+   * Формирует telemetry-заголовки непосредственно перед API-запросом.
+   *
+   * @param actionPath Абсолютный API-путь, который участвует в вычислении cv1.
+   * @param properties Дополнительные строковые свойства; порядок результата
+   * определяется последующей канонической сортировкой Rust.
+   * @returns Полный набор заголовков для объединения с заголовками HTTP-запроса.
+   */
   async getConversionHeaders(
     actionPath: string,
     properties: Record<string, string> = {},
   ): Promise<Record<string, string>> {
-    // Object entries preserve the caller's data without introducing timestamps.
+    // На границу WASM свойства передаются массивом пар, а не JSON-объектом.
     const inputPairs = Object.entries(properties);
     const runtime = await this.runtime.acquire();
     const rawPayload = runtime.calculate_funnel_score(actionPath, JSON.stringify(inputPairs));
@@ -46,7 +61,10 @@ export class TelemetrySdk {
   }
 }
 
-/** Parses and validates the complete runtime response before header creation. */
+/**
+ * Разбирает и валидирует полный ответ runtime до создания заголовков.
+ * Любая ошибка отклоняет Promise: частичный или непроверенный результат не возвращается.
+ */
 function readPayload(raw: string): ConversionPayload {
   let candidate: unknown;
   try {
@@ -54,14 +72,16 @@ function readPayload(raw: string): ConversionPayload {
   } catch {
     throw new Error('Invalid runtime response: malformed JSON');
   }
-
   if (!isPayload(candidate)) {
     throw new Error('Invalid runtime response: inconsistent fields');
   }
   return candidate;
 }
 
-/** Checks every field consumed by the facade, including nested pair values. */
+/**
+ * Проверяет все поля ответа WASM, включая вложенные пары свойств.
+ * Type guard одновременно доказывает TypeScript, что candidate имеет ConversionPayload.
+ */
 function isPayload(candidate: unknown): candidate is ConversionPayload {
   if (typeof candidate !== 'object' || candidate === null) {
     return false;
@@ -76,7 +96,7 @@ function isPayload(candidate: unknown): candidate is ConversionPayload {
     && value['properties'].every(isProperty);
 }
 
-/** Checks one canonical `[name, value]` tuple from the runtime response. */
+/** Проверяет, что свойство является кортежем ровно из двух строк. */
 function isProperty(candidate: unknown): candidate is ConversionProperty {
   return Array.isArray(candidate)
     && candidate.length === 2
@@ -84,7 +104,10 @@ function isProperty(candidate: unknown): candidate is ConversionProperty {
     && typeof candidate[1] === 'string';
 }
 
-/** Encodes UTF-8 JSON with base64url and removes all trailing padding. */
+/**
+ * Кодирует UTF-8 JSON как base64url и удаляет завершающий padding.
+ * Это транспортное кодирование, а не шифрование свойств.
+ */
 function encodeBase64Url(value: string): string {
   const bytes = new TextEncoder().encode(value);
   let binary = '';
@@ -94,5 +117,5 @@ function encodeBase64Url(value: string): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-// Keep this type import referenced in generated declarations for loader consumers.
+// Сохраняет тип в generated declarations для потребителей loader-контракта.
 export type { PixelRuntime };
