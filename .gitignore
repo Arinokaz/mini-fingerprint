@@ -6,6 +6,7 @@
 # JavaScript dependencies and build output.
 node_modules/
 dist/
+release/
 .angular/
 playwright-report/
 test-results/

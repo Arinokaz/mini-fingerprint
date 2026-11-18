@@ -21,7 +21,7 @@ function readOption(name, fallback) {
 
 const variant = readOption('variant', 'embedded');
 const outDirOption = readOption('out-dir', 'dist');
-if (variant !== 'embedded') {
+if (variant !== 'embedded' && variant !== 'lazy') {
   throw new Error(`Unsupported package variant: ${variant}`);
 }
 const outDir = resolve(packageRoot, outDirOption);
@@ -44,10 +44,9 @@ if (declarations.status !== 0) {
   throw new Error(`TypeScript declarations exited with status ${declarations.status ?? 'unknown'}`);
 }
 
-await build({
+const options = {
   absWorkingDir: packageRoot,
   entryPoints: ['src/index.ts'],
-  outfile: resolve(outDir, 'index.js'),
   bundle: true,
   format: 'esm',
   platform: 'browser',
@@ -55,7 +54,18 @@ await build({
   minify: true,
   legalComments: 'none',
   sourcemap: false,
-});
+};
+if (variant === 'lazy') {
+  await build({
+    ...options,
+    outdir: outDir,
+    entryNames: 'index',
+    splitting: true,
+    chunkNames: 'pixel-[hash]',
+  });
+} else {
+  await build({ ...options, outfile: resolve(outDir, 'index.js') });
+}
 
 for (const file of readdirSync(outDir)) {
   if (file.endsWith('.js') || file.endsWith('.d.ts')) {
