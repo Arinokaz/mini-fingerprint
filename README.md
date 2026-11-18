@@ -32,6 +32,8 @@
 
 Подробная карта всех исходников, generated-файлов и команд: [`docs/frontend-guide.md`](docs/frontend-guide.md).
 
+Сборка WASM без повторной установки Rust на каждой машине, создание локального `.tgz`, подключение пакета к другому Angular-проекту и production-деплой: [`docs/deployment.md`](docs/deployment.md).
+
 ```text
 apps/demo-web/                    Angular demo
 packages/marketing-telemetry/     Локальный TypeScript NPM-пакет
