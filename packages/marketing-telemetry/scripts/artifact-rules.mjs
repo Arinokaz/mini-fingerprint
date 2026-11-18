@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-const bannedTerms = /\b(?:security|protection|secret|token|attack|bot|signature|authentication|authorization)\b/i;
+const bannedTerms = /(?:security|protection|secret|token|attack|bot|signature|authentication|authorization)/i;
 
 /** Removes long payloads before checking identifiers and comments in shipped text. */
 export function withoutEmbeddedPayload(source) {

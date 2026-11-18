@@ -70,6 +70,11 @@ if (selectedWindowsBrowser && process.env['WSL_DISTRO_NAME'] && mayDelegate) {
 }
 
 assert.ok(existsSync(resolve(browserRoot, 'index.html')), 'Build demo-web production before this check.');
+const indexDocument = await readFile(resolve(browserRoot, 'index.html'), 'utf8');
+const initialScriptPaths = new Set(
+  [...indexDocument.matchAll(/(?:src|href)=["']([^"']+\.js)["']/g)]
+    .map((match) => new URL(match[1], 'http://localhost/').pathname),
+);
 const fixtureDocument = JSON.parse(await readFile(resolve(root, 'tests/fixtures/conversion-v1.json'), 'utf8'));
 const fixtureByName = new Map(fixtureDocument.cases.map((testCase) => [testCase.name, testCase]));
 const validLogin = fixtureByName.get('login-production-valid');
@@ -264,10 +269,10 @@ try {
     () => devtools.evaluate("document.readyState === 'complete' && document.querySelectorAll('button').length === 2"),
     'Angular page and controls',
   );
-  const initialScripts = new Set(networkUrls.filter((url) => new URL(url).pathname.endsWith('.js')));
-  const deferredScriptRequests = () => networkUrls.filter(
-    (url) => new URL(url).pathname.endsWith('.js') && !initialScripts.has(url),
-  );
+  const deferredScriptRequests = () => networkUrls.filter((url) => {
+    const pathname = new URL(url).pathname;
+    return pathname.endsWith('.js') && !initialScriptPaths.has(pathname);
+  });
   if (packageVariant === 'lazy') {
     assert.deepEqual(deferredScriptRequests(), [], 'lazy pixel chunk must not load with the initial page');
   }
@@ -303,6 +308,9 @@ try {
   };
 
   await click(0, 1);
+  if (packageVariant === 'lazy') {
+    assert.equal(deferredScriptRequests().length, 1, 'lazy chunk must load on the first submission');
+  }
   const validHeaders = headersOf(requests[0]);
   assert.equal(validHeaders['x-ga-measurement-id'], 'cv1');
   assert.equal(validHeaders['x-ga-session-id'], validLogin.pulse);

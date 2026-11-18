@@ -35,10 +35,12 @@ before(() => {
 test('artifact scanner ignores payload accidents but rejects revealing code', () => {
   const payload = `${'A'.repeat(600)}token`;
   assert.doesNotThrow(() => assertNeutralArtifact(`const payload="${payload}";`, 'payload.js'));
-  assert.throws(
-    () => assertNeutralArtifact('const security = true;', 'revealing.js'),
-    /sensitive implementation terminology/,
-  );
+  for (const revealing of ['const security = true;', 'const clientSecret = 1;', 'authorizationHeader();', 'securityFlag = false;']) {
+    assert.throws(
+      () => assertNeutralArtifact(revealing, 'revealing.js'),
+      /sensitive implementation terminology/,
+    );
+  }
 });
 
 test('release archives contain separate embedded and lazy layouts without sources', () => {
@@ -63,15 +65,21 @@ test('release JavaScript is neutral and stores the base64 payload exactly once',
       assertNeutralArtifact(archiveText(archive, path), path);
     }
   }
-  const embedded = archiveText(embeddedArchive, 'package/dist/index.js');
+  const embeddedTextPaths = archivePaths(embeddedArchive).filter((path) => /\.(?:js|d\.ts)$/.test(path));
+  const embeddedPayloadPaths = embeddedTextPaths.filter(
+    (path) => (archiveText(embeddedArchive, path).match(payloadPattern) ?? []).length > 0,
+  );
+  assert.deepEqual(embeddedPayloadPaths, ['package/dist/index.js']);
+
   const lazyEntry = archiveText(lazyArchive, 'package/dist/index.js');
   const lazyChunkPath = archivePaths(lazyArchive).find((path) => /pixel-[A-Z0-9]+\.js$/.test(path));
   assert.ok(lazyChunkPath);
-  const lazyChunk = archiveText(lazyArchive, lazyChunkPath);
-  assert.equal((embedded.match(payloadPattern) ?? []).length, 1);
-  assert.equal((lazyEntry.match(payloadPattern) ?? []).length, 0);
-  assert.equal((lazyChunk.match(payloadPattern) ?? []).length, 1);
-  assert.ok(lazyEntry.length < embedded.length, 'lazy facade must be smaller than embedded entry');
+  const lazyTextPaths = archivePaths(lazyArchive).filter((path) => /\.(?:js|d\.ts)$/.test(path));
+  const lazyPayloadPaths = lazyTextPaths.filter(
+    (path) => (archiveText(lazyArchive, path).match(payloadPattern) ?? []).length > 0,
+  );
+  assert.deepEqual(lazyPayloadPaths, [lazyChunkPath]);
+  assert.ok(lazyEntry.length < archiveText(embeddedArchive, 'package/dist/index.js').length);
 });
 
 test('size report measures raw Wasm, base64 and every variant file', () => {

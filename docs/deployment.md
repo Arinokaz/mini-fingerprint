@@ -207,7 +207,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const wasm = readFileSync('packages/marketing-telemetry/pkg/pixel.wasm');
 const source = '/** AUTO-GENERATED from a prebuilt pixel.wasm; do not edit. */\n'
-  + `export const PIXEL_BASE64 = ${JSON.stringify(wasm.toString('base64'))};\n`;
+  + `export const PIXEL_BASE64: string = ${JSON.stringify(wasm.toString('base64'))};\n`;
 
 writeFileSync('packages/marketing-telemetry/src/generated-pixel.ts', source);
 NODE
