@@ -18,7 +18,7 @@
 | Полный репозиторий, Rust не установлен | Node.js/npm, Rust stable, target `wasm32-unknown-unknown`, `wasm-pack` | [Полная сборка из Rust](#3-полная-сборка-из-rust) |
 | Полный репозиторий и готовые `pkg/` + `generated-pixel.ts` | Только Node.js/npm | [Сборка пакета из готовых WASM-артефактов](#4-сборка-пакета-без-rust) |
 | Полный репозиторий и только результаты прежнего `wasm-pack` | Только Node.js/npm, если сохранился JS glue | [Восстановление `generated-pixel.ts`](#43-если-есть-pixelwasm-но-нет-generated-pixelts) |
-| Готовый архив `company-marketing-telemetry-0.1.0.tgz` | Только окружение вашего Angular-проекта | [Установка в Angular](#6-подключение-к-любому-angular-проекту) |
+| Готовый архив `company-marketing-telemetry-0.1.0-embedded.tgz` | Только окружение вашего Angular-проекта | [Установка в Angular](#6-подключение-к-любому-angular-проекту) |
 
 Во всех командах ниже используются условные пути:
 
@@ -135,13 +135,12 @@ packages/marketing-telemetry/
 npm run build --workspace @company/marketing-telemetry
 ```
 
-TypeScript создаёт `packages/marketing-telemetry/dist/`, включая:
+Сборщик пакета создаёт `packages/marketing-telemetry/dist/`:
 
-- `dist/index.js` и `dist/index.d.ts` — публичная точка входа;
-- `dist/generated-pixel.js` — base64-представление WASM;
-- остальные скомпилированные модули пакета.
+- `dist/index.js` — минифицированный ESM entry с facade, runtime, wasm-bindgen glue и base64-WASM;
+- `dist/index.d.ts` и остальные declarations — типы для TypeScript, не загружаемые браузером.
 
-Корневая команда `npm run build` дополнительно собирает Angular demo. Для подготовки одного npm-пакета она не обязательна.
+JavaScript минифицируется **до создания npm-архива**, поэтому его вид не зависит от настроек Angular optimization. Комментарии и source maps не создаются. Корневая команда `npm run build` дополнительно собирает Angular demo; она использует embedded-вариант по умолчанию.
 
 ## 4. Сборка пакета без Rust
 
@@ -187,12 +186,10 @@ test -f packages/marketing-telemetry/src/generated-pixel.ts
 
 ```bash
 npm ci
-npm run build --workspace @company/marketing-telemetry
+npm run build:release --workspace @company/marketing-telemetry
 ```
 
-**Не выполняйте** `npm run build:wasm`: эта команда заново компилирует Rust и поэтому требует `wasm-pack`.
-
-После TypeScript-сборки переходите к [созданию npm-архива](#5-создание-и-проверка-локального-npm-архива).
+**Не выполняйте** `npm run build:wasm`: эта команда заново компилирует Rust и поэтому требует `wasm-pack`. Release-сборка использует уже перенесённые `pkg/` и `generated-pixel.ts`, минифицирует оба варианта и создаёт архивы без повторной Rust-компиляции.
 
 ### 4.3. Если есть `pixel.wasm`, но нет `generated-pixel.ts`
 
@@ -220,59 +217,73 @@ NODE
 
 Если сохранился **только** `pixel.wasm` без JS glue, правильные варианты — найти остальные результаты исходной сборки или один раз повторить полную сборку на машине с Rust. В дальнейшем сохраняйте весь комплект из раздела 4.1.
 
-## 5. Создание и проверка локального npm-архива
+## 5. Создание и проверка двух npm-архивов
 
-Перед упаковкой должны существовать и `dist/`, и `pkg/`. В `package.json` нет `prepack`-скрипта, поэтому `npm pack` **не собирает проект автоматически**.
-
-Из корня `/path/to/mini-fingerprint`:
+Из корня `/path/to/mini-fingerprint` выполните полную сборку:
 
 ```bash
-mkdir -p /path/to/mini-fingerprint/release
-npm pack --workspace @company/marketing-telemetry \
-  --pack-destination /path/to/mini-fingerprint/release
+npm run build:npm
 ```
 
-Для версии `0.1.0` будет создан:
+Команда сначала запускает `build:wasm`, затем минифицирует и упаковывает два независимых варианта. Если `pkg/` и `generated-pixel.ts` уже перенесены с другой машины, Rust не нужен — вместо полной команды используйте `npm run build:release --workspace @company/marketing-telemetry`, как показано в разделе 4.2.
+
+Для версии `0.1.0` будут созданы:
 
 ```text
-/path/to/mini-fingerprint/release/company-marketing-telemetry-0.1.0.tgz
+release/
+├── company-marketing-telemetry-0.1.0-embedded.tgz
+├── company-marketing-telemetry-0.1.0-lazy.tgz
+├── size-report.json
+└── staging/                         # Служебные файлы для проверок, не для установки
 ```
 
-Поле `"private": true` запрещает случайную публикацию в registry, но не мешает локальным `npm pack` и `npm install`.
+Оба архива содержат package name `@company/marketing-telemetry` и version `0.1.0`, но устанавливать нужно только один вариант.
 
-### 5.1. Проверка содержимого до установки
+### 5.1. Выбор варианта
 
-Dry-run показывает содержимое без создания архива:
+| Вариант | Содержимое runtime | Поведение в Angular |
+|---|---|---|
+| `embedded` | Один минифицированный `dist/index.js` с base64-WASM | Смешивается с общим bundle; дополнительный runtime JS не запрашивается |
+| `lazy` | Небольшой `dist/index.js` и `dist/pixel.<hash>.js` | Runtime загружается при первом `getConversionHeaders()`; повторные вызовы используют тот же runtime |
+
+`embedded` — основной вариант, когда важнее максимально смешать библиотеку с остальной минификацией проекта. `lazy` уменьшает стартовый bundle, если размер WASM важнее дополнительного JS-запроса.
+
+Angular может переименовать `pixel.<hash>.js` в собственный `chunk.<hash>.js`: это нормально. Отдельного `.wasm`-запроса нет в обоих вариантах.
+
+### 5.2. Размер
+
+Файл `release/size-report.json` содержит:
+
+- `rawWasmBytes` — размер `pixel.wasm`;
+- `base64Bytes` — размер base64-представления;
+- `variants.embedded.files` и `variants.lazy.files` — размер каждого JS и его gzip-размер.
+
+Base64 увеличивает бинарные данные примерно на треть. Сравнивайте фактические значения из отчёта после каждого изменения алгоритма. Произвольный лимит пока не установлен: сначала нужен измеренный baseline конкретного приложения.
+
+### 5.3. Проверка содержимого и поведения
 
 ```bash
-npm pack --workspace @company/marketing-telemetry --dry-run
+npm run test:release --workspace @company/marketing-telemetry
 ```
 
-Для уже созданного `.tgz`:
+Проверяются оба реальных `.tgz`, отсутствие исходников/docs/`.wasm`/`.map`/комментариев и чувствительных терминов, единственная base64-строка, размеры и совпадение golden-заголовков.
+
+Посмотреть содержимое вручную:
 
 ```bash
-tar -tzf /path/to/mini-fingerprint/release/company-marketing-telemetry-0.1.0.tgz
+tar -tzf /path/to/mini-fingerprint/release/company-marketing-telemetry-0.1.0-embedded.tgz
+tar -tzf /path/to/mini-fingerprint/release/company-marketing-telemetry-0.1.0-lazy.tgz
 ```
 
-В архиве должны быть как минимум:
+В embedded-архиве runtime находится в `package/dist/index.js`. В lazy-архиве дополнительно есть ровно один `package/dist/pixel-<hash>.js`. Каталога `package/pkg/` и отдельного `pixel.wasm` нет: generated glue уже включён в минифицированный JS.
 
-```text
-package/package.json
-package/dist/index.js
-package/dist/index.d.ts
-package/dist/generated-pixel.js
-package/pkg/funnel_wasm.js
-package/pkg/funnel_wasm.d.ts
-package/pkg/funnel_wasm_bg.wasm.d.ts
-```
-
-Файла `package/pkg/pixel.wasm` в архиве быть не должно. Его байты уже находятся в `dist/generated-pixel.js`. Это проверяется также тестом `packages/marketing-telemetry/tests/package-contents.test.ts`.
-
-Для полного набора проверок пакета, когда generated-файлы уже есть:
+Проверка установки каждого архива в отдельный Angular demo, production build и реальный браузер:
 
 ```bash
-npm test --workspace @company/marketing-telemetry
+npm run test:package:angular
 ```
+
+Для неё нужен существующий Chromium/Chrome. Поле `"private": true` запрещает случайную публикацию в registry, но не мешает локальным `npm pack` и `npm install`.
 
 ## 6. Подключение к любому Angular-проекту
 
@@ -284,10 +295,16 @@ npm test --workspace @company/marketing-telemetry
 
 ```bash
 cd /path/to/angular-app
-npm install /path/to/mini-fingerprint/release/company-marketing-telemetry-0.1.0.tgz
+npm install /path/to/mini-fingerprint/release/company-marketing-telemetry-0.1.0-embedded.tgz
 ```
 
-npm добавит пакет в `dependencies` и обновит `package-lock.json`.
+Для lazy-варианта вместо этого используйте:
+
+```bash
+npm install /path/to/mini-fingerprint/release/company-marketing-telemetry-0.1.0-lazy.tgz
+```
+
+npm добавит пакет в `dependencies` и обновит `package-lock.json`. Импорт и вызовы `TelemetrySdk` одинаковые в обоих случаях.
 
 Для команды и CI удобнее передавать архив как артефакт и использовать относительный путь, например:
 
@@ -296,13 +313,13 @@ angular-app/
 ├── package.json
 ├── package-lock.json
 └── vendor/
-    └── company-marketing-telemetry-0.1.0.tgz
+    └── company-marketing-telemetry-0.1.0-embedded.tgz
 ```
 
 Тогда из корня Angular-приложения:
 
 ```bash
-npm install ./vendor/company-marketing-telemetry-0.1.0.tgz
+npm install ./vendor/company-marketing-telemetry-0.1.0-embedded.tgz
 ```
 
 В `package.json` появится зависимость вида:
@@ -310,7 +327,7 @@ npm install ./vendor/company-marketing-telemetry-0.1.0.tgz
 ```json
 {
   "dependencies": {
-    "@company/marketing-telemetry": "file:vendor/company-marketing-telemetry-0.1.0.tgz"
+    "@company/marketing-telemetry": "file:vendor/company-marketing-telemetry-0.1.0-embedded.tgz"
   }
 }
 ```
@@ -326,7 +343,7 @@ cd /path/to/angular-app
 npm install /path/to/mini-fingerprint/packages/marketing-telemetry
 ```
 
-Этот способ удобен для локальной разработки, но хуже воспроизводится: каталог без generated-файлов или `dist/` неработоспособен. После изменения пакета повторно соберите его TypeScript, затем перезапустите сборку Angular. Для передачи другому разработчику и CI предпочтителен `.tgz`.
+Этот способ удобен для локальной разработки, но хуже воспроизводится: каталог без generated-файлов или `dist/` неработоспособен. После изменения пакета повторно выполните его минифицированную build-команду, затем перезапустите сборку Angular. Для передачи другому разработчику и CI предпочтителен `.tgz`.
 
 Проверка установки в обоих вариантах:
 
@@ -445,8 +462,8 @@ X-YM-Counter-Client
 
 ### 8.1. Рекомендуемый конвейер
 
-1. **Build job:** установить Node.js и Rust, выполнить `npm ci`, `npm run build:wasm`, TypeScript-сборку и `npm pack`.
-2. **Сохранение артефакта:** передать `.tgz` в job Angular-сборки. Дополнительно можно сохранить `pkg/` и `generated-pixel.ts`, чтобы следующие сборки могли обходиться без Rust.
+1. **Build job:** установить Node.js и Rust, выполнить `npm ci` и `npm run build:npm`.
+2. **Сохранение артефакта:** передать выбранный `embedded` или `lazy` `.tgz` в job Angular-сборки. Сохранить `size-report.json`; дополнительно можно сохранить `pkg/` и `generated-pixel.ts`, чтобы следующие сборки могли обходиться без Rust.
 3. **Angular job:** установить `.tgz` через `file:`-зависимость, выполнить `npm ci` и production-сборку Angular.
 4. **Deploy job:** опубликовать статический результат Angular-сборки обычным способом проекта.
 
@@ -456,11 +473,8 @@ X-YM-Counter-Client
 cd /path/to/mini-fingerprint
 npm ci
 rustup target add wasm32-unknown-unknown
-npm run build:wasm
-npm run build --workspace @company/marketing-telemetry
-mkdir -p /path/to/mini-fingerprint/release
-npm pack --workspace @company/marketing-telemetry \
-  --pack-destination /path/to/mini-fingerprint/release
+npm run build:npm
+npm run test:release --workspace @company/marketing-telemetry
 ```
 
 `wasm-pack` должен быть установлен заранее в образе runner или шагом `cargo install wasm-pack --locked`.
@@ -526,17 +540,17 @@ rustup target add wasm32-unknown-unknown
 
 ### В `.tgz` нет `dist/index.js`
 
-Перед `npm pack` выполните:
+Создайте оба release-архива заново:
 
 ```bash
-npm run build --workspace @company/marketing-telemetry
+npm run build:npm
 ```
 
-`npm pack` сам не запускает TypeScript-сборку.
+Если generated WASM-артефакты уже перенесены и Rust отсутствует, используйте `npm run build:release --workspace @company/marketing-telemetry`.
 
 ### В `.tgz` нет `pixel.wasm`
 
-Это ожидаемое поведение, а не ошибка. Проверьте наличие `dist/generated-pixel.js`: именно там находятся base64-байты WASM.
+Это ожидаемое поведение, а не ошибка. В embedded-варианте base64-байты находятся в `dist/index.js`, а в lazy — в `dist/pixel.<hash>.js`.
 
 ### Angular сообщает, что не может найти `@company/marketing-telemetry`
 

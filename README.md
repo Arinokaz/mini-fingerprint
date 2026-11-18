@@ -64,9 +64,11 @@ npm run test:browser
 ```
 
 - `build:wasm` собирает `packages/marketing-telemetry/pkg/pixel.wasm` без SHA/HMAC и встраивает его байты base64-строкой в `src/generated-pixel.ts`.
+- `build:npm` создаёт минифицированные `embedded` (один JS) и `lazy` (facade + `pixel.<hash>.js`) архивы, а также `release/size-report.json` с фактическими размерами.
 - NPM runtime декодирует base64 в `Uint8Array`; отдельный `.wasm` HTTP-запрос и копирование в Angular public assets не используются.
-- `npm test` проверяет контракт, TypeScript-фасад, реальный embedded Wasm с запрещённым `fetch` и сервис отправки.
+- `npm test` проверяет контракт, TypeScript-фасад, оба собранных варианта, реальный Wasm с запрещённым `fetch` и сервис отправки.
 - `test:browser` запускает production Angular, проверяет отсутствие запроса `pixel.wasm`, точные значения заголовков, валидный/missing/empty/duplicate DOM и login/register.
+- `test:package:angular` устанавливает каждый `.tgz` в изолированный Angular demo и дополнительно проверяет отсутствие лишних chunks в embedded и однократную lazy-загрузку.
 - В WSL скрипт автоматически использует существующие Windows Node.js 22+ и Chrome только при выборе Windows-браузера. Явный Linux `CHROME_BIN` имеет приоритет; делегирование Windows можно запретить через `BROWSER_CHECK_NO_WINDOWS=1`.
 - Browser-проверка сверяет production `pulse` и `score` с независимыми golden fixtures и декодирует свойства всех пяти запросов.
 

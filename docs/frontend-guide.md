@@ -8,8 +8,9 @@
 
 ```bash
 npm install       # Только если зависимости ещё не установлены.
-npm run build     # Wasm → base64 TypeScript → NPM dist → Angular production.
-npm test          # Контракт, TypeScript и реальный Wasm.
+npm run build     # Wasm → base64 → minified embedded NPM dist → Angular production.
+npm run build:npm # Дополнительно: embedded + lazy .tgz и size-report.json.
+npm test          # Контракт, TypeScript, оба NPM-варианта и реальный Wasm.
 npm run test:browser
 ```
 
@@ -95,7 +96,8 @@ hash-security/
 
 - `packages/marketing-telemetry/pkg/**` — создаёт `wasm-pack`/`wasm-bindgen`.
 - `packages/marketing-telemetry/src/generated-pixel.ts` — создаёт `scripts/build-wasm.mjs`.
-- `packages/marketing-telemetry/dist/**` — создаёт TypeScript.
+- `packages/marketing-telemetry/dist/**` — declarations создаёт TypeScript, минимизированный JS — esbuild.
+- `release/**` — создаёт release-скрипт: два `.tgz`, staging и size report.
 - `apps/demo-web/dist/**` — создаёт Angular.
 - `Cargo.lock`, `package-lock.json` — изменяются менеджерами зависимостей, но коммитятся.
 
@@ -130,7 +132,7 @@ packages/marketing-telemetry/src/generated-pixel.ts
 export const PIXEL_BASE64 = 'AGFzbQEAAAAB...';
 ```
 
-Сырой `pixel.wasm` остаётся доступен для низкоуровневых тестов и анализа, но **Angular его не запрашивает и не копирует в public assets**. В `npm pack` включаются только скомпилированный `dist`, JS glue и declarations; raw `.wasm` исключается через generated `pkg/.npmignore`. Тест `package-contents.test.ts` проверяет это при каждом `npm test`.
+Сырой `pixel.wasm` остаётся доступен для низкоуровневых тестов и анализа, но **Angular его не запрашивает и не копирует в public assets**. В `npm pack` включается только минимизированный `dist`: JS glue и base64 объединяются в JS, raw `.wasm` и generated `pkg/` в архив не входят. Тесты `package-contents.test.ts` и `release.test.ts` проверяют содержимое архивов.
 
 ### Точка входа Rust
 
@@ -157,14 +159,24 @@ calculate_funnel_score(journey, properties_json)
 npm run build --workspace @company/marketing-telemetry
 ```
 
-TypeScript компилирует пакет в `packages/marketing-telemetry/dist`.
+TypeScript создаёт declarations, а esbuild объединяет и минифицирует пакет в `packages/marketing-telemetry/dist`. Это embedded-сборка по умолчанию.
 
-Во время выполнения `runtime.ts`:
+Для обоих распространяемых архивов:
 
-1. Импортирует `PIXEL_BASE64`.
-2. Декодирует строку через `atob` в `Uint8Array`.
-3. Передаёт байты в `wasm-bindgen` как `module_or_path`.
-4. Получает `PixelRuntime` без `fetch` для Wasm.
+```bash
+npm run build:npm
+```
+
+- `embedded` помещает runtime и base64 в `dist/index.js`;
+- `lazy` выносит их в `dist/pixel.<hash>.js`, который загружается при первом API-вызове;
+- `release/size-report.json` показывает raw/base64/JS/gzip-размеры.
+
+Во время выполнения:
+
+1. `runtime.ts` загружает `pixel-runtime.ts` только при первом обращении.
+2. `pixel-runtime.ts` декодирует `PIXEL_BASE64` через `atob` в `Uint8Array`.
+3. Байты передаются в `wasm-bindgen` как `module_or_path`.
+4. Получается `PixelRuntime` без `fetch` для Wasm.
 
 Angular использует только:
 

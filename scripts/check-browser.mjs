@@ -11,7 +11,12 @@ import { setTimeout as delay } from 'node:timers/promises';
 
  /** Repository root and production output under test. */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const browserRoot = resolve(root, 'apps/demo-web/dist/demo-web/browser');
+const browserRoot = process.env['DEMO_BROWSER_ROOT']
+  ? resolve(root, process.env['DEMO_BROWSER_ROOT'])
+  : resolve(root, 'apps/demo-web/dist/demo-web/browser');
+const packageVariant = process.env['TELEMETRY_VARIANT'] ?? 'embedded';
+console.log(`Browser check: requested variant=${packageVariant}; platform=${process.platform}.`);
+assert.ok(['embedded', 'lazy'].includes(packageVariant), `Unknown telemetry variant: ${packageVariant}`);
 const profileDirectory = resolve(tmpdir(), 'opencode', 'chrome-profile');
 
 /** Existing browser paths; CHROME_BIN can override discovery without installation. */
@@ -45,7 +50,22 @@ if (selectedWindowsBrowser && process.env['WSL_DISTRO_NAME'] && mayDelegate) {
   const major = Number.parseInt(String(versionResult.stdout).replace(/^v/, '').split('.')[0], 10);
   assert.ok(versionResult.status === 0 && major >= 22, 'Windows Node.js 22+ with native WebSocket is required.');
   const scriptPath = execFileSync('wslpath', ['-w', fileURLToPath(import.meta.url)], { encoding: 'utf8' }).trim();
-  const result = spawnSync(windowsNode, [scriptPath], { stdio: 'inherit' });
+  const delegatedBrowserRoot = process.env['DEMO_BROWSER_ROOT'] === undefined
+    ? {}
+    : { DEMO_BROWSER_ROOT: execFileSync('wslpath', ['-w', browserRoot], { encoding: 'utf8' }).trim() };
+  const delegatedVariables = [
+    'TELEMETRY_VARIANT/w',
+    ...(process.env['DEMO_BROWSER_ROOT'] === undefined ? [] : ['DEMO_BROWSER_ROOT/w']),
+  ];
+  const result = spawnSync(windowsNode, [scriptPath], {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      TELEMETRY_VARIANT: packageVariant,
+      ...delegatedBrowserRoot,
+      WSLENV: [process.env['WSLENV'], ...delegatedVariables].filter(Boolean).join(':'),
+    },
+  });
   process.exit(result.status ?? 1);
 }
 
@@ -244,6 +264,13 @@ try {
     () => devtools.evaluate("document.readyState === 'complete' && document.querySelectorAll('button').length === 2"),
     'Angular page and controls',
   );
+  const initialScripts = new Set(networkUrls.filter((url) => new URL(url).pathname.endsWith('.js')));
+  const deferredScriptRequests = () => networkUrls.filter(
+    (url) => new URL(url).pathname.endsWith('.js') && !initialScripts.has(url),
+  );
+  if (packageVariant === 'lazy') {
+    assert.deepEqual(deferredScriptRequests(), [], 'lazy pixel chunk must not load with the initial page');
+  }
 
   /** Returns header lookup helpers with case-insensitive names. */
   const headersOf = (request) => Object.fromEntries(
@@ -327,7 +354,13 @@ try {
   assert.equal(registerHeaders['x-amplitude-device-id'], validRegister.score);
   assertProperties(registerHeaders, 'register');
   const wasmRequests = networkUrls.filter((url) => new URL(url).pathname.endsWith('.wasm'));
+  console.log(`Browser check: validating ${packageVariant} package network behavior.`);
   assert.deepEqual(wasmRequests, [], `Unexpected Wasm requests: ${wasmRequests.join(', ')}`);
+  if (packageVariant === 'embedded') {
+    assert.deepEqual(deferredScriptRequests(), [], 'embedded package must not request a separate runtime chunk');
+  } else {
+    assert.equal(deferredScriptRequests().length, 1, 'lazy runtime chunk must load exactly once for all submissions');
+  }
   assert.equal(exceptions.length, 0, JSON.stringify(exceptions));
   console.log('Browser check passed: Angular + real Wasm, valid/missing/empty/duplicate DOM, login/register, headers and generic 403.');
 } finally {
