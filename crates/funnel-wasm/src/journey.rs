@@ -63,8 +63,8 @@ pub struct JourneyContext {
     touchpoint: String,
     /// Проверенные дополнительные свойства в каноническом порядке.
     properties: CanonicalProperties,
-    /// Временное окно, выбранное внутри WASM.
-    selected_window: u64,
+    /// Точный Unix timestamp текущей секунды, полученный внутри WASM.
+    timestamp: u64,
     /// Обратимое представление для последней стадии и HTTP-заголовка.
     pulse: (u32, u32),
 }
@@ -75,7 +75,7 @@ impl JourneyContext {
         journey: &str,
         touchpoint: &str,
         properties: CanonicalProperties,
-        selected_window: u64,
+        timestamp: u64,
     ) -> Result<Self, JourneyError> {
         validate_journey(journey)?;
         if touchpoint.is_empty() || touchpoint.len() > 256 {
@@ -87,8 +87,8 @@ impl JourneyContext {
             journey: journey.to_owned(),
             touchpoint: touchpoint.to_owned(),
             properties,
-            selected_window,
-            pulse: encode_pulse(selected_window),
+            timestamp,
+            pulse: encode_pulse(timestamp),
         })
     }
 
@@ -107,9 +107,9 @@ impl JourneyContext {
         &self.properties
     }
 
-    /// Возвращает decoded window, используемый в pulse payload.
-    pub fn selected_window(&self) -> u64 {
-        self.selected_window
+    /// Возвращает decoded timestamp, используемый в pulse payload.
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
     }
 
     /// Возвращает encoded words для pulse payload и HTTP-заголовка.

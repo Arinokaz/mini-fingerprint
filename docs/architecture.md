@@ -5,8 +5,9 @@
 | Компонент | Ответственность | Подробное описание |
 |---|---|---|
 | Angular `App` | Хранит состояние demo и инициирует login/register | [`modules/angular-demo.md`](modules/angular-demo.md) |
-| `ConversionDemoService` | Вызывает пакет непосредственно перед `fetch` и отправляет JSON | [`modules/angular-demo.md`](modules/angular-demo.md) |
-| `TelemetrySdk` | Публичный npm API, проверка ответа WASM, формирование заголовков | [`modules/telemetry-package.md`](modules/telemetry-package.md) |
+| `ConversionDemoService` | Отправляет login/register JSON через `HttpClient` | [`modules/angular-demo.md`](modules/angular-demo.md) |
+| `marketingTelemetryInterceptor` | Извлекает pathname, получает свежие заголовки и клонирует каждый `HttpClient`-запрос | [`modules/telemetry-package.md`](modules/telemetry-package.md) |
+| `TelemetrySdk` | Проверка ответа WASM и формирование заголовков | [`modules/telemetry-package.md`](modules/telemetry-package.md) |
 | `RuntimeGate` | Однократная инициализация и разделение concurrent-вызовов | [`modules/telemetry-package.md`](modules/telemetry-package.md) |
 | `pixel-runtime.ts` | Base64 decode и инициализация WebAssembly из bytes | [`modules/telemetry-package.md`](modules/telemetry-package.md) |
 | Rust `funnel-wasm` | Время, DOM, канонизация свойств и вычисления `cv1` | [`modules/rust-wasm.md`](modules/rust-wasm.md) |
@@ -18,48 +19,37 @@
 Пользователь нажимает кнопку
         │
         ▼
-Angular App.submit(journey, email, password)
-        │
-        ▼
 ConversionDemoService.submit(...)
-  • определяет свойство form=login/register
-  • вызывает TelemetrySdk.getConversionHeaders(journey, { form })
+  • отправляет JSON через Angular HttpClient
+  • не выбирает специальные login/register telemetry-свойства
         │
         ▼
-TelemetrySdk
-  • сохраняет порядок Object.entries(properties)
-  • запрашивает runtime у RuntimeGate
+marketingTelemetryInterceptor
+  • извлекает только pathname из URL
+  • запрашивает свежие заголовки у root TelemetrySdk
         │
         ▼
 RuntimeGate
   • при первом вызове запускает loadPixelRuntime()
-  • concurrent-вызовы получают один Promise
-  • после ошибки позволяет повторить инициализацию
+  • concurrent-вызовы получают один Promise инициализации
         │
         ▼
 pixel-runtime.ts
-  • декодирует PIXEL_BASE64 через atob
-  • создаёт Uint8Array
-  • передаёт bytes в wasm-bindgen
-  • отдельный .wasm HTTP-запрос не выполняется
+  • декодирует PIXEL_BASE64 и передаёт bytes в wasm-bindgen
         │
         ▼
-Rust calculate_funnel_score(journey, propertiesJson)
-  • получает Date.now() в браузере
-  • вычисляет временное окно
+Rust calculate_funnel_score(journey, "[]")
+  • получает точный Unix timestamp текущей секунды
   • читает span.telemetrics_click[data-tag]
-  • разбирает/проверяет дополнительные свойства
-  • выполняет стадии journey → touchpoint → properties → pulse
+  • выполняет journey → touchpoint → properties → pulse
         │
         ▼
-JSON из Rust: profile, pulse, score, properties
+TelemetrySdk проверяет JSON и возвращает пять заголовков
         │
         ▼
-TelemetrySdk проверяет форму ответа и создаёт заголовки
-        │
-        ▼
-ConversionDemoService объединяет их с Content-Type
-и выполняет POST journey с email/password
+Interceptor клонирует request и один раз передаёт его downstream
+  • ошибка генерации → исходный request без telemetry-заголовков
+  • HTTP-ошибка downstream → передаётся приложению без retry
 ```
 
 ## 3. Что возвращает npm-пакет
@@ -69,7 +59,7 @@ ConversionDemoService объединяет их с Content-Type
 | Заголовок | Содержимое |
 |---|---|
 | `X-GA-Measurement-Id` | Версия профиля, сейчас `cv1` |
-| `X-GA-Session-Id` | `pulse` — обратимое представление временного окна |
+| `X-GA-Session-Id` | `pulse` — обратимое представление Unix timestamp в секундах |
 | `X-Amplitude-Device-Id` | `score` — 64 строчных hex-символа |
 | `X-Amplitude-Session-Properties` | Канонический JSON свойств в base64url без padding |
 | `X-YM-Counter-Client` | Статическое telemetry-значение |
@@ -88,7 +78,7 @@ JSON-массив пар `[name, value]`, а не JSON-объект. TypeScript 
 
 ### Текущее время
 
-TypeScript не передаёт доверенный timestamp. Rust сам получает `js_sys::Date::now()` и использует правила временных окон `cv1`.
+TypeScript не передаёт timestamp как аргумент. Rust сам получает `js_sys::Date::now()` и использует `floor(now / 1000)`. Одинаковые входы в одну секунду дают одинаковый результат; серверный допуск ограничивает срок повторного использования.
 
 ### DOM
 

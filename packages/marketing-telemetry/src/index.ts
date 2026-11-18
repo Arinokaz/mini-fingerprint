@@ -5,4 +5,5 @@
  * и внутреннее состояние инициализации остаются внутри пакета.
  */
 export { TelemetrySdk } from './conversion.js';
+export { marketingTelemetryInterceptor } from './angular-interceptor.js';
 export type { RuntimeLoader } from './types.js';

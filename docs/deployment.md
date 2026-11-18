@@ -287,7 +287,7 @@ npm run test:package:angular
 
 ## 6. Подключение к любому Angular-проекту
 
-Пакет не имеет Angular-зависимостей и не требует Angular schematic. Подходят современные Angular-проекты с ESM bundler и поддержкой browser WebAssembly. Очень старые Angular/toolchain-версии без поддержки ES2022 могут потребовать обновления; это ограничение потребителя, а не дополнительный шаг настройки WASM.
+Пакет является Angular-only и использует `@angular/common`, `@angular/core` и `rxjs` через `peerDependencies`. Подходят современные Angular-проекты с ESM bundler и поддержкой browser WebAssembly. Очень старые Angular/toolchain-версии без поддержки ES2022 могут потребовать обновления; это ограничение потребителя, а не дополнительный шаг настройки WASM.
 
 ### 6.1. Вариант A: установка готового `.tgz` — рекомендуется
 
@@ -386,65 +386,51 @@ protected readonly touchpoint = environment.touchpoint;
 
 `data-tag` должен быть непустым и совпадать со значением, которого ожидает серверная проверка текущей сборки. Элемент должен существовать в активном DOM **до вызова** `getConversionHeaders()`. Не размещайте несколько элементов `.telemetrics_click` одновременно: duplicate/missing/empty обрабатываются fallback-логикой, но такие состояния не должны быть нормальной интеграцией.
 
-### 7.2. Сгенерируйте заголовки непосредственно перед запросом
+### 7.2. Подключите interceptor
 
-Пример сервиса с Angular `HttpClient`:
-
-```typescript
-import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
-import { TelemetrySdk } from '@company/marketing-telemetry';
-import { firstValueFrom } from 'rxjs';
-
-@Injectable({ providedIn: 'root' })
-export class AuthService {
-  private readonly http = inject(HttpClient);
-  private readonly telemetry = new TelemetrySdk();
-
-  async login(email: string, password: string): Promise<unknown> {
-    const actionPath = '/api/auth/login';
-
-    // Вызывать здесь, непосредственно перед отправкой, а не при старте приложения.
-    const telemetryHeaders = await this.telemetry.getConversionHeaders(actionPath, {
-      form: 'login',
-    });
-
-    return firstValueFrom(this.http.post(
-      actionPath,
-      { email, password },
-      {
-        headers: {
-          ...telemetryHeaders,
-          'Content-Type': 'application/json',
-        },
-      },
-    ));
-  }
-}
-```
-
-Если `HttpClient` ещё не настроен, в современном standalone Angular добавьте `provideHttpClient()` в providers приложения. В NgModule-проекте используйте принятую в нём настройку `HttpClientModule`.
-
-Сигнатура публичного API:
+В standalone Angular зарегистрируйте пакет в существующем `HttpClient`:
 
 ```typescript
-const telemetry = new TelemetrySdk();
+import { provideHttpClient, withInterceptors } from "@angular/common/http";
+import { marketingTelemetryInterceptor } from "@company/marketing-telemetry";
 
-const headers: Record<string, string> = await telemetry.getConversionHeaders(
-  actionPath,
-  properties,
-);
+providers: [
+  provideHttpClient(withInterceptors([marketingTelemetryInterceptor])),
+]
 ```
 
-Параметры:
+После этого обычный сервис использует только `HttpClient`:
 
-- `actionPath: string` — обязательный API-путь; он должен совпадать с путём, который проверяет backend;
-- `properties: Record<string, string>` — необязательные дополнительные свойства;
-- результат — `Promise<Record<string, string>>` с полным набором telemetry-заголовков.
+**Порядок interceptor’ов:** Angular применяет functional interceptors к запросу в порядке регистрации. `marketingTelemetryInterceptor` рекомендуется указывать **последним**, после interceptor’ов, которые добавляют API prefix, заменяют origin или иначе переписывают URL:
 
-Не заменяйте возвращаемый объект одним выбранным заголовком: объединяйте весь объект с заголовками запроса, как показано выше.
+```typescript
+provideHttpClient(withInterceptors([
+  apiUrlInterceptor,
+  marketingTelemetryInterceptor,
+]))
+```
 
-### 7.3. Если API находится на другом origin
+Тогда WASM получает pathname окончательного запроса. Никакой зарегистрированный после telemetry interceptor не должен снова менять URL, иначе подписанный путь и фактический серверный маршрут разойдутся.
+
+```typescript
+return this.http.post("/api/auth/login", { email, password });
+```
+
+Interceptor обрабатывает все `HttpClient`-запросы, передаёт в WASM только pathname и вызывает `getConversionHeaders(path, {})` заново для каждого запроса. Пять заголовков добавляются целиком. Специальные `form=login/register` больше не используются.
+
+`@angular/common`, `@angular/core` и `rxjs` объявлены как `peerDependencies`: пакет использует копии этих библиотек из приложения и не встраивает второй Angular в bundle. Текущий manifest требует Angular `>=17` и RxJS `^7.8.0`; фактически сборка проверена на Angular 21. Перед интеграцией в боевое приложение необходимо подтвердить его версии Angular/RxJS и при необходимости отдельно проверить более старый toolchain.
+
+Пакет не выполняет retry. Если инициализация или вычисление WASM завершились ошибкой, interceptor один раз отправляет исходный запрос без telemetry-заголовков; backend определяет дальнейшую политику. HTTP-ошибка backend не перехватывается как ошибка генерации и не вызывает повторную отправку.
+
+Прямые вызовы нативного `fetch` и XHR вне `HttpClient` interceptor не обрабатывает.
+
+### 7.3. Timestamp и ручной API
+
+Для нестандартной интеграции остаётся доступен `TelemetrySdk.getConversionHeaders(actionPath, properties)`. Обычному Angular-приложению ручной вызов не нужен.
+
+WASM сам получает `floor(Date.now() / 1000)`. Временные окна удалены: `pulse` кодирует точный timestamp, поэтому одинаковые входы в одну секунду дают одинаковый результат, а на следующей секунде результат меняется. Backend должен проверять возраст timestamp; рекомендуемые начальные допуски — 30 секунд в прошлое и 5 секунд в будущее.
+
+### 7.4. Если API находится на другом origin
 
 При cross-origin запросе CORS настраивается на API-сервере. Кроме `Content-Type`, сервер должен разрешить передаваемые пакетом заголовки:
 

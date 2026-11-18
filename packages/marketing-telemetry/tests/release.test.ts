@@ -1,3 +1,4 @@
+import '@angular/compiler';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -35,7 +36,11 @@ before(() => {
 test('artifact scanner ignores payload accidents but rejects revealing code', () => {
   const payload = `${'A'.repeat(600)}token`;
   assert.doesNotThrow(() => assertNeutralArtifact(`const payload="${payload}";`, 'payload.js'));
-  for (const revealing of ['const security = true;', 'const clientSecret = 1;', 'authorizationHeader();', 'securityFlag = false;']) {
+  assert.doesNotThrow(() => assertNeutralArtifact(
+    "import { InjectionToken } from '@angular/core';",
+    'angular.d.ts',
+  ));
+  for (const revealing of ['const security = true;', 'const clientSecret = 1;', 'const authToken = 1;', 'authorizationHeader();', 'securityFlag = false;']) {
     assert.throws(
       () => assertNeutralArtifact(revealing, 'revealing.js'),
       /sensitive implementation terminology/,

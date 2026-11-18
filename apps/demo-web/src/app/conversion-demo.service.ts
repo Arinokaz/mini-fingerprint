@@ -1,14 +1,8 @@
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+
 /** Два API-пути, поддерживаемые демонстрационной страницей. */
 export type ApiJourney = '/api/auth/login' | '/api/auth/register';
-
-/** Минимальный telemetry-контракт, необходимый сервису отправки. */
-export interface ConversionClient {
-  /** Получает заголовки непосредственно перед соответствующим запросом. */
-  getConversionHeaders(
-    actionPath: string,
-    properties?: Record<string, string>,
-  ): Promise<Record<string, string>>;
-}
 
 /** Безопасный для шаблона результат без тела и внутренних деталей ответа. */
 export interface SubmissionResult {
@@ -18,39 +12,24 @@ export interface SubmissionResult {
   message: string;
 }
 
-/**
- * Координирует вычисление telemetry и отправку JSON.
- * Не хранит credentials и не реализует серверную проверку.
- */
+/** Отправляет JSON; telemetry-заголовки добавляет зарегистрированный interceptor. */
 export class ConversionDemoService {
-  /**
-   * Принимает минимальный client и сетевую границу.
-   * Default wrapper сохраняет globalThis как receiver браузерного fetch.
-   */
-  constructor(
-    private readonly conversions: ConversionClient,
-    private readonly fetcher: typeof fetch = (input, init) => globalThis.fetch(input, init),
-  ) {}
+  constructor(private readonly http: HttpClient) {}
 
-  /** Формирует свежие заголовки и сразу отправляет login/register POST. */
+  /** Отправляет login/register POST и скрывает детали HTTP-отклонения. */
   async submit(journey: ApiJourney, email: string, password: string): Promise<SubmissionResult> {
-    const actionName = journey.endsWith('/register') ? 'register' : 'login';
-    const conversionHeaders = await this.conversions.getConversionHeaders(journey, {
-      form: actionName,
-    });
-    const response = await this.fetcher(journey, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        ...conversionHeaders,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
-    });
-
-    return {
-      status: response.status,
-      message: response.ok ? 'Сервер принял запрос.' : 'Сервер отклонил запрос.',
-    };
+    try {
+      const response = await firstValueFrom(this.http.post(
+        journey,
+        { email, password },
+        { observe: 'response' },
+      ));
+      return { status: response.status, message: 'Сервер принял запрос.' };
+    } catch (error: unknown) {
+      if (error instanceof HttpErrorResponse && error.status > 0) {
+        return { status: error.status, message: 'Сервер отклонил запрос.' };
+      }
+      throw error;
+    }
   }
 }

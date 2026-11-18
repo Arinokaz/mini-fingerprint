@@ -60,6 +60,7 @@ const options = {
   minify: true,
   legalComments: 'none',
   sourcemap: false,
+  external: ['@angular/*', 'rxjs', 'rxjs/*'],
 };
 if (variant === 'lazy') {
   // Dynamic import pixel-runtime становится единственным content-hashed chunk.

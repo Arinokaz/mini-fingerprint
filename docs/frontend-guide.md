@@ -147,7 +147,7 @@ calculate_funnel_score(journey, properties_json)
 Он самостоятельно:
 
 - получает время через `js_sys::Date::now()`;
-- вычисляет временное окно;
+- вычисляет точный Unix timestamp текущей секунды;
 - ищет `span.telemetrics_click` и читает `data-tag`;
 - подставляет fallback при missing/empty/duplicate DOM;
 - выполняет `stages_v1()`;
@@ -180,11 +180,7 @@ npm run build:npm
 3. Байты передаются в `wasm-bindgen` как `module_or_path`.
 4. Получается `PixelRuntime` без `fetch` для Wasm.
 
-Angular использует только:
-
-```typescript
-const telemetry = new TelemetrySdk();
-```
+Angular регистрирует `marketingTelemetryInterceptor` через `provideHttpClient(withInterceptors(...))`. Root `InjectionToken` создаёт `TelemetrySdk`, поэтому обычным сервисам ручной вызов пакета не нужен. Angular/RxJS подключаются как peer dependencies.
 
 Параметр `pixelUrl` больше не нужен и удалён из API.
 

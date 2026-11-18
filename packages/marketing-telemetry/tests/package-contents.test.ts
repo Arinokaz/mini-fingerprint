@@ -30,3 +30,8 @@ test('NPM tarball contains only the minified embedded runtime and declarations',
   assertNeutralArtifact(javascript, 'dist/index.js');
   assertNeutralArtifact(declarations, 'dist/index.d.ts');
 });
+
+test('package peer contract requires RxJS with top-level pipeable operators', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(manifest.peerDependencies.rxjs, '^7.8.0');
+});

@@ -1,6 +1,6 @@
 # Rust/WASM crate `funnel-wasm`
 
-Crate находится в `crates/funnel-wasm`. Он получает API-путь и дополнительные свойства от TypeScript, самостоятельно читает время/DOM и возвращает JSON с `profile`, `pulse`, `score` и каноническими `properties`.
+Crate находится в `crates/funnel-wasm`. Он получает API-путь и дополнительные свойства от TypeScript, самостоятельно читает точный Unix timestamp/DOM и возвращает JSON с `profile`, `pulse`, `score` и каноническими `properties`.
 
 Нормативный алгоритм: [`../../contracts/conversion-v1.md`](../../contracts/conversion-v1.md). Этот документ объясняет реализацию и ответственность файлов, но не заменяет контракт.
 
@@ -85,7 +85,7 @@ pub fn calculate_funnel_score(
 3. `js_sys::Date::now()` получает браузерные миллисекунды.
 4. Нефинитное или отрицательное время отклоняется.
 5. Миллисекунды преобразуются в целые секунды.
-6. `select_window()` выбирает текущее/следующее окно.
+6. `now_seconds` используется как точный timestamp текущей секунды.
 7. `current_touchpoint()` получает DOM marker или fallback.
 8. `JourneyContext::new()` проверяет входы и вычисляет encoded pulse.
 9. `Frame::from_journey()` ещё раз проверяет путь и создаёт initial frame.
@@ -128,19 +128,19 @@ Struct с приватным `message: String`.
 | `journey` | Проверенный путь |
 | `touchpoint` | DOM marker или fallback |
 | `properties` | Уже канонизированные свойства |
-| `selected_window` | Выбранное окно `u64` |
+| `timestamp` | Точный Unix timestamp текущей секунды `u64` |
 | `pulse` | Два encoded `u32` |
 
 ### `JourneyContext::new(...)`
 
-Проверяет journey, требует `touchpoint` длиной `1..=256` UTF-8 bytes, сохраняет owned values и вызывает `encode_pulse(selected_window)`.
+Проверяет journey, требует `touchpoint` длиной `1..=256` UTF-8 bytes, сохраняет owned values и вызывает `encode_pulse(timestamp)`.
 
 ### Getters
 
 - `journey()` — путь для `JourneyStage`;
 - `touchpoint()` — marker/fallback для `TouchpointStage`;
 - `properties()` — свойства для `PropertiesStage`;
-- `selected_window()` — decoded window для `PulseStage`;
+- `timestamp()` — decoded timestamp для `PulseStage`;
 - `pulse()` — encoded words для `PulseStage` и HTTP header.
 
 Getters не меняют состояние. Это позволяет stages использовать один согласованный контекст.
@@ -239,18 +239,11 @@ u32le(name byte length) || name bytes || u32le(value byte length) || value bytes
 
 ## 7. Время и pulse — `src/pulse.rs`
 
-### `select_window(now_seconds: u64): u64`
+Wasm получает `Date.now()` и вычисляет `timestamp = floor(nowMilliseconds / 1000)`. Временные окна и клиентский boundary buffer не используются. Одинаковые входы в одну секунду дают одинаковый результат; уникальность nonce не предполагается.
 
-- Делит время на 180-second intervals.
-- Находит начало и конец текущего окна.
-- Если до конца осталось **строго меньше 15 секунд**, выбирает следующее окно.
-- Ровно 15 секунд — ещё текущее окно.
+### `encode_pulse(timestamp: u64): (u32, u32)`
 
-Это клиентский boundary buffer, а не серверное правило допустимых окон.
-
-### `encode_pulse(window: u64): (u32, u32)`
-
-1. Разделяет window на low/high 32-bit words.
+1. Разделяет timestamp на low/high 32-bit words.
 2. Применяет XOR masks.
 3. Выполняет два фиксированных Feistel-like раунда с add/rotate.
 4. Применяет output masks.
@@ -259,7 +252,7 @@ u32le(name byte length) || name bytes || u32le(value byte length) || value bytes
 
 ### `decode_pulse(parts: (u32, u32)): u64`
 
-Применяет обратные операции в обратном порядке и восстанавливает window. Будущий PHP должен также проверить каноничность повторным кодированием.
+Применяет обратные операции в обратном порядке и восстанавливает timestamp. Будущий PHP должен также проверить каноничность повторным кодированием.
 
 ### `pulse_to_hex(parts): String`
 
@@ -335,7 +328,7 @@ JourneyStage → TouchpointStage → PropertiesStage → PulseStage
 | `JourneyStage` | UTF-8 bytes API path | `0x4a` | 4 |
 | `TouchpointStage` | UTF-8 bytes marker/fallback | `0xb7` | 4 |
 | `PropertiesStage` | Length-prefixed canonical pairs | `0xd9` | 4 |
-| `PulseStage` | `u32le(out0) || u32le(out1) || u64le(window)` | `0xe3` | 8 |
+| `PulseStage` | `u32le(out0) || u32le(out1) || u64le(timestamp)` | `0xe3` | 8 |
 
 Каждая вызывает `absorb()`, затем `settle_frame()`. Пустой properties payload всё равно проходит stage с domain и нулевой длиной.
 
@@ -385,7 +378,7 @@ JourneyStage → TouchpointStage → PropertiesStage → PulseStage
 | `tests/codec_tests.rs` | Golden canonical JSON/bytes, limits, malformed shapes, duplicates/reserved names, escaping/UTF-8 |
 | `tests/frame_tests.rs` | Arithmetic vectors, initial frame, malformed journeys, final score serialization |
 | `tests/touchpoint_tests.rs` | Single valid marker, missing/empty/duplicate/oversized fallback, ровно 256 UTF-8 bytes |
-| `tests/pulse_tests.rs` | Golden encode/decode/hex, boundary 15/14 seconds, 10 000 round trips |
+| `tests/pulse_tests.rs` | Golden encode/decode/hex, 10 000 timestamp round trips |
 | `tests/stage_tests.rs` | Каждый intermediate frame против fixtures, final score, 100 повторов без global state, native median budget |
 | `src/stages.rs` internal tests | Эквивалентность projections и settle на 10 000 generated cases |
 | TypeScript/browser tests | Реальный WASM и совпадение HTTP-заголовков |

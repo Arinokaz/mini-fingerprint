@@ -55,6 +55,15 @@ test('real Wasm reproduces the missing-DOM fixture and emits stable telemetry he
     );
     assert.notEqual(otherPath['X-Amplitude-Device-Id'], headers['X-Amplitude-Device-Id']);
 
+    Date.now = () => (testCase.now + 1) * 1000;
+    const nextSecond = await sdk.getConversionHeaders(
+      testCase.journey,
+      Object.fromEntries(testCase.inputProperties),
+    );
+    assert.notEqual(nextSecond['X-GA-Session-Id'], headers['X-GA-Session-Id']);
+    assert.notEqual(nextSecond['X-Amplitude-Device-Id'], headers['X-Amplitude-Device-Id']);
+
+    Date.now = () => testCase.now * 1000;
     const raw = await loadGeneratedPixel();
     const payload = JSON.parse(raw.calculate_funnel_score(testCase.journey, testCase.canonicalPropertiesJson)) as ConversionPayload;
     assert.equal(payload.score, testCase.score);

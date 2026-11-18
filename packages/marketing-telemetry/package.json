@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local browser conversion telemetry facade backed by WebAssembly.",
+  "description": "Angular browser telemetry interceptor backed by WebAssembly.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -16,6 +16,11 @@
     "dist"
   ],
   "sideEffects": false,
+  "peerDependencies": {
+    "@angular/common": ">=17.0.0",
+    "@angular/core": ">=17.0.0",
+    "rxjs": "^7.8.0"
+  },
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "test:release": "tsx --test tests/release.test.ts",

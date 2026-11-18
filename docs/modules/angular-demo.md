@@ -1,119 +1,37 @@
 # Angular demo
 
-Демонстрационное приложение находится в `apps/demo-web`. Его задача — показать реальную интеграцию npm-пакета и проверить заголовки/WASM в браузере. Это не готовая форма авторизации и не backend.
+Демонстрационное приложение находится в `apps/demo-web`. Оно проверяет реальную интеграцию Angular `HttpClient`, npm interceptor и Rust/WASM. Это не готовая форма авторизации и не backend.
 
-## 1. Запуск приложения — `src/main.ts`
+## 1. Bootstrap — `src/main.ts`
 
 ```typescript
 bootstrapApplication(App, {
-  providers: [provideZonelessChangeDetection()],
+  providers: [
+    provideZonelessChangeDetection(),
+    provideHttpClient(withInterceptors([marketingTelemetryInterceptor])),
+  ],
 });
 ```
 
-- Используется standalone component `App`.
-- Zone.js не подключается; изменение состояния построено на signals.
-- Ошибка bootstrap выводится в `console.error`.
-
-В реальном приложении пакет можно подключать без копирования способа bootstrap.
+Interceptor регистрируется один раз. Все запросы `HttpClient`, включая login/register, проходят через него без endpoint allowlist и специальных свойств формы. Нативный `fetch` в demo не используется.
 
 ## 2. Компонент `App` — `src/app/app.ts`
 
-### Назначение
+`App` хранит:
 
-Связывает шаблон demo, `TelemetrySdk` и `ConversionDemoService`, управляет состоянием отправки.
+- `touchpoint` из текущего environment;
+- `status` и `busy` как signals;
+- `ConversionDemoService`, созданный с внедрённым `HttpClient`.
 
-### Свойства
+`App.submit()` блокирует повторный submit через `busy`, вызывает сервис и показывает generic результат. Ошибки generation/network не раскрываются шаблону; техническая информация остаётся в console разработчика. Credentials не сохраняются в состоянии компонента.
 
-| Свойство | Назначение |
-|---|---|
-| `touchpoint` | Значение `data-tag` из текущего environment |
-| `status` | Signal с пользовательским состоянием операции |
-| `busy` | Signal, запрещающий повторный submit во время запроса |
-| `telemetry` | Экземпляр настоящего `TelemetrySdk` |
-| `demo` | Сервис отправки, получающий telemetry через constructor |
+## 3. Сервис `ConversionDemoService`
 
-`telemetry` и `demo` являются приватными: шаблон использует публичный сценарий `submit`, а не детали пакета.
-
-### Метод `submit`
+Сигнатура:
 
 ```typescript
-protected async submit(
-  journey: ApiJourney,
-  email: string,
-  password: string,
-): Promise<void>
-```
+constructor(http: HttpClient)
 
-**Где вызывается:** из `(click)` кнопок login/register в `app.html`.
-
-**Логика:**
-
-1. Если `busy()` уже истинно, метод завершается — второй запрос не начинается.
-2. Устанавливает `busy=true` и статус «Отправка запроса…».
-3. Вызывает `demo.submit(journey, email, password)`.
-4. Показывает generic message и HTTP status из результата.
-5. При исключении пишет техническую ошибку в console, а пользователю показывает только «Не удалось выполнить запрос.».
-6. В `finally` снимает `busy` независимо от результата.
-
-**Side effects:** косвенно загружает/инициализирует WASM и выполняет HTTP-запрос.
-
-**Инвариант:** credentials не записываются в состояние компонента или отдельное хранилище; значения передаются непосредственно в сервис.
-
-## 3. Сервис `ConversionDemoService` — `src/app/conversion-demo.service.ts`
-
-### Назначение
-
-Координирует получение telemetry-заголовков и последующий POST. Именно здесь важен порядок «сначала вычисление, сразу затем отправка».
-
-### Тип `ApiJourney`
-
-```typescript
-type ApiJourney = '/api/auth/login' | '/api/auth/register'
-```
-
-Разрешает только два demo-пути на уровне TypeScript.
-
-### Интерфейс `ConversionClient`
-
-Структурный контракт:
-
-```typescript
-getConversionHeaders(
-  actionPath: string,
-  properties?: Record<string, string>,
-): Promise<Record<string, string>>
-```
-
-Сервис зависит от этой минимальной формы, а не от конкретных деталей WASM. `TelemetrySdk` соответствует ей автоматически. Тесты могут передать контролируемую реализацию.
-
-### Интерфейс `SubmissionResult`
-
-```typescript
-{
-  status: number;
-  message: string;
-}
-```
-
-Это результат для компонента, а не исходный ответ сервера.
-
-### Constructor
-
-```typescript
-constructor(
-  private readonly conversions: ConversionClient,
-  private readonly fetcher: typeof fetch =
-    (input, init) => globalThis.fetch(input, init),
-)
-```
-
-Первый параметр — telemetry client, второй — сетевой boundary для тестов.
-
-Default `fetcher` специально вызывает `globalThis.fetch(...)` как метод глобального объекта. Это сохраняет корректный browser receiver и проверяется отдельным тестом.
-
-### Метод `submit`
-
-```typescript
 async submit(
   journey: ApiJourney,
   email: string,
@@ -121,51 +39,38 @@ async submit(
 ): Promise<SubmissionResult>
 ```
 
-**Логика:**
+Сервис вызывает только:
 
-1. Определяет `actionName`: путь, заканчивающийся `/register`, получает `register`, остальной разрешённый union — `login`.
-2. Вызывает `getConversionHeaders(journey, { form: actionName })`.
-3. Выполняет `fetch(journey, ...)` с:
-   - `method: 'POST'`;
-   - `credentials: 'same-origin'`;
-   - всеми пятью telemetry-заголовками;
-   - `Content-Type: application/json`;
-   - JSON body `{ email, password }`.
-4. Возвращает HTTP status и одно из двух generic сообщений по `response.ok`.
-
-**Ошибки:** исключения conversion/network не перехватываются внутри сервиса; их получает `App.submit`.
-
-**Чего метод не делает:** не читает тело отклонённого ответа, не показывает серверные детали, не добавляет timestamp в JSON body и не сохраняет credentials.
-
-## 4. Шаблон — `src/app/app.html`
-
-### Inputs
-
-Template reference variables `#email` и `#password` дают текущие `.value` при нажатии. Это demo-упрощение, не reactive forms implementation.
-
-### Buttons
-
-- Login вызывает `submit('/api/auth/login', email.value, password.value)`.
-- Register вызывает `submit('/api/auth/register', ...)`.
-- `[disabled]="busy()"` блокирует обе кнопки во время операции.
-
-### Статус
-
-```html
-<p role="status" aria-live="polite">{{ status() }}</p>
+```typescript
+http.post(journey, { email, password }, { observe: 'response' })
 ```
 
-`aria-live` помогает assistive technology получить изменение состояния.
+Он не создаёт `TelemetrySdk`, не получает заголовки и не добавляет `form=login/register`. Это делает interceptor.
 
-### DOM touchpoint
+HTTP-ответ с ненулевым status превращается в generic «Сервер принял/отклонил запрос». Network error со status `0` остаётся observable для компонента. Сервис не читает тело ошибки в шаблон и не выполняет retry.
+
+## 4. Interceptor и WASM
+
+Для каждого запроса interceptor:
+
+1. Извлекает pathname без origin/query/fragment.
+2. Получает один root `TelemetrySdk` через `InjectionToken`.
+3. Вызывает `getConversionHeaders(path, {})` заново.
+4. При успехе клонирует request с пятью заголовками.
+5. При ошибке генерации отправляет исходный request без telemetry-заголовков.
+6. Передаёт downstream HTTP-ошибку приложению без повторной отправки.
+
+Первый вызов лениво инициализирует WASM. Runtime общий, а заголовки не кэшируются.
+
+## 5. Шаблон и DOM touchpoint
 
 ```html
 <span class="telemetrics_click" [attr.data-tag]="touchpoint" hidden></span>
 ```
 
-Именно этот элемент ищет Rust. `hidden` скрывает его визуально, но оставляет в DOM. Он должен существовать к моменту вычисления и быть ровно одним.
+Элемент должен существовать в активном DOM ровно в одном экземпляре. Missing/empty/duplicate/oversized marker приводит к `telemetry.unresolved.v1`, а не исключению. Backend должен отклонять fallback для защищаемых операций.
 
-## 5. Environments
+## 6. Environments
 
 | Файл | `touchpoint` |
 |---|---|
@@ -173,25 +78,10 @@ Template reference variables `#email` и `#password` дают текущие `.v
 | `environment.staging.ts` | `staging-build-tag` |
 | `environment.development.ts` | `dsf3fdfgdfg` |
 
-Angular `fileReplacements` выбирает development/staging версию. Значение должно быть согласовано с конфигурацией будущей серверной проверки. `pixelUrl` отсутствует: WASM встроен в пакет.
+`data-tag` должен совпадать с ожидаемым значением будущей серверной конфигурации. `pixelUrl` отсутствует: WASM встроен в JS.
 
-## 6. Что находится вне demo
+## 7. Вне demo и тесты
 
-- Реального PHP endpoint нет.
-- Browser test server возвращает generic `403` для `/api/*`.
-- Demo не реализует хранение учётных записей, сессии, rate limiting или серверную mirror-проверку.
-- [`../deployment.md`](../deployment.md) содержит отдельный пример с Angular `HttpClient`; текущий demo сознательно использует `fetch`.
+Реальный PHP endpoint отсутствует; browser test server возвращает generic `403`. `apps/demo-web/tests/conversion-demo.service.test.ts` проверяет `HttpClient`-запросы, generic HTTP results и network failures. `packages/marketing-telemetry/tests/angular-interceptor.test.ts` проверяет headers, pathname, fail-open и отсутствие downstream retry.
 
-## 7. Связанные тесты
-
-`apps/demo-web/tests/conversion-demo.service.test.ts` проверяет:
-
-1. Точный journey, telemetry-заголовки, JSON body и отсутствие plaintext timestamp.
-2. Отдельный register path: **unit-тест проверяет только register path** и не проверяет переданные properties. Значение `form=register` отдельно подтверждается browser assertion в корневом `scripts/check-browser.mjs`.
-3. Generic результат для `403` без серверных деталей.
-4. Корректный receiver у default `fetch`.
-5. Видимость network/conversion исключений для компонента.
-
-`scripts/check-browser.mjs` дополнительно проверяет production Angular с реальным WASM, golden login/register, valid/missing/empty/duplicate DOM, отсутствие `.wasm`-запросов и embedded/lazy network behavior.
-
-При переносе пакета в другое приложение можно сохранить собственный Angular component/service; обязательными являются совместимый вызов `TelemetrySdk`, передача всех заголовков и DOM-контракт.
+`scripts/check-browser.mjs` дополнительно проверяет production Angular с реальным WASM, empty canonical properties, golden login/register, DOM variants, отсутствие `.wasm`-запросов и embedded/lazy network behavior. Полный browser regression выполняется отдельно после быстрых unit/build проверок.

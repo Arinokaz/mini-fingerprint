@@ -1,11 +1,12 @@
 # TypeScript npm-пакет `@company/marketing-telemetry`
 
-Пакет находится в `packages/marketing-telemetry`. Он связывает Angular с Rust/WASM, но сам не содержит Angular-зависимостей. Его можно использовать из браузерного TypeScript/JavaScript через нейтральный telemetry API.
+Пакет находится в `packages/marketing-telemetry`. Это Angular-only browser ESM-пакет: он предоставляет `marketingTelemetryInterceptor` и `TelemetrySdk`, а Angular/RxJS используются как `peerDependencies` приложения.
 
 ## 1. Карта файлов
 
 | Файл | Ответственность |
 |---|---|
+| `src/angular-interceptor.ts` | Root `InjectionToken`, pathname extraction и `HttpInterceptorFn` |
 | `src/index.ts` | Публичная точка входа пакета |
 | `src/conversion.ts` | `TelemetrySdk`, проверка ответа WASM, формирование заголовков |
 | `src/runtime.ts` | Lazy-загрузка runtime и `RuntimeGate` |
@@ -19,18 +20,17 @@
 
 ## 2. Публичная точка входа `src/index.ts`
 
-Наружу экспортируются:
+Наружу экспортируются `TelemetrySdk`, `marketingTelemetryInterceptor` и тип `RuntimeLoader`. Обычному приложению достаточно:
 
 ```typescript
-export { TelemetrySdk } from './conversion.js';
-export type { RuntimeLoader } from './types.js';
+provideHttpClient(withInterceptors([marketingTelemetryInterceptor]))
 ```
 
-Это ограничивает поверхность пакета. Angular не импортирует Rust, generated glue или внутренние helper-функции напрямую.
+Interceptor обрабатывает каждый `HttpClient`-запрос без endpoint allowlist. Его следует регистрировать последним в `withInterceptors([...])`, после любых преобразований API URL: запрос проходит functional interceptors в порядке регистрации, а подпись должна использовать окончательный pathname. Последующие interceptor’ы не должны переписывать URL после вычисления заголовков. `new URL(request.url, DOCUMENT.baseURI).pathname` учитывает реальный `<base href>` и удаляет origin, query и fragment; `urlWithParams` в WASM не передаётся. Для каждого запроса вызывается `getConversionHeaders(path, {})`. Root `InjectionToken` создаёт один `TelemetrySdk`, поэтому `RuntimeGate` общий, а результаты вычислений не кэшируются.
 
-Расширение `.js` в импорте TypeScript-исходника намеренное: после компиляции оно соответствует ESM-файлу, который получит потребитель.
+Ошибка генерации превращается в исходный request без telemetry-заголовков. `catchError` находится до downstream `switchMap`, поэтому HTTP-ошибка backend не вызывает повторную отправку. Собственного retry в пакете нет.
 
-## 3. Класс `TelemetrySdk` — `src/conversion.ts`
+## 3. `TelemetrySdk` — `src/conversion.ts`
 
 ### Назначение
 
@@ -210,7 +210,7 @@ export const PIXEL_BASE64: string = '...';
 
 1. Очищает только указанный generated output.
 2. Запускает TypeScript `--emitDeclarationOnly`.
-3. Использует esbuild: browser ESM, ES2022, bundle, minify, no legal comments, no source maps.
+3. Использует esbuild: browser ESM, ES2022, bundle, minify, no legal comments, no source maps. Angular и RxJS остаются external peer dependencies.
 4. В lazy включает splitting и `chunkNames=pixel-[hash]`.
 5. Проверяет JS/declarations через artifact rules.
 
@@ -229,12 +229,13 @@ export const PIXEL_BASE64: string = '...';
 ### `scripts/artifact-rules.mjs`
 
 - `withoutEmbeddedPayload()` исключает длинные base64-литералы перед текстовым сканированием.
-- `assertNeutralArtifact()` запрещает comments, `sourceMappingURL` и термины `security`, `protection`, `secret`, `token`, `attack`, `bot`, `signature`, `authentication`, `authorization` без учёта регистра, включая вхождения в camelCase.
+- `assertNeutralArtifact()` запрещает comments, `sourceMappingURL` и термины `security`, `protection`, `secret`, `token`, `attack`, `bot`, `signature`, `authentication`, `authorization` без учёта регистра, включая вхождения в camelCase. Единственное узкое исключение — framework identifier `InjectionToken`; обычные имена `authToken` по-прежнему запрещены.
 
 ## 11. Связанные тесты
 
 | Тест | Что доказывает |
 |---|---|
+| `tests/angular-interceptor.test.ts` | Все методы, pathname, полный набор headers, generation fail-open и отсутствие downstream retry |
 | `tests/conversion.test.ts` | Аргументы, пустые свойства, concurrent initialization, отклонение malformed payload |
 | `tests/runtime.test.ts` | Lazy start, shared Promise, retry после ошибки |
 | `tests/pixel.integration.test.ts` | Реальный WASM, golden headers, determinism, отсутствие `fetch` |

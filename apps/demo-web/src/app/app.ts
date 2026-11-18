@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
-import { TelemetrySdk } from '@company/marketing-telemetry';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { environment } from '../environments/environment';
 import { ApiJourney, ConversionDemoService } from './conversion-demo.service';
 
@@ -21,10 +21,8 @@ export class App {
   /** Запрещает повторный submit, пока предыдущая операция не завершилась. */
   protected readonly busy = signal(false);
 
-  /** Локальный npm-фасад с base64-WASM; инициализация происходит при submit. */
-  private readonly telemetry = new TelemetrySdk();
-  /** Координатор telemetry-заголовков и HTTP-запроса. */
-  private readonly demo = new ConversionDemoService(this.telemetry);
+  /** Координатор HTTP-запроса; interceptor добавляет telemetry независимо от формы. */
+  private readonly demo = new ConversionDemoService(inject(HttpClient));
 
   /**
    * Получает свежие заголовки и отправляет выбранный login/register запрос.

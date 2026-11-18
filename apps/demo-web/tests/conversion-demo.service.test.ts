@@ -1,108 +1,72 @@
+import '@angular/compiler';
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { HttpClient, HttpErrorResponse, HttpResponse } from '@angular/common/http';
+import { of, throwError } from 'rxjs';
 import { ConversionDemoService } from '../src/app/conversion-demo.service.js';
- 
-const conversionHeaders = {
-  'X-GA-Measurement-Id': 'cv1',
-  'X-GA-Session-Id': '0011223344556677',
-  'X-Amplitude-Device-Id': '0123456789abcdef'.repeat(4),
-  'X-Amplitude-Session-Properties': 'W10',
-  'X-YM-Counter-Client': 'v2.10.4-pixel',
-};
 
-test('submission forwards the exact journey and telemetry headers', async () => {
-  const conversionCalls: Array<{ journey: string; properties?: Record<string, string> }> = [];
-  const requests: Array<{ input: string; init?: RequestInit }> = [];
-  const service = new ConversionDemoService(
-    {
-      getConversionHeaders: async (journey, properties) => {
-        conversionCalls.push({ journey, properties });
-        return conversionHeaders;
-      },
+interface PostCall {
+  journey: string;
+  body: unknown;
+  options: Record<string, unknown>;
+}
+
+function httpWith(
+  implementation: (journey: string, body: unknown, options: Record<string, unknown>) => unknown,
+): { http: HttpClient; calls: PostCall[] } {
+  const calls: PostCall[] = [];
+  const http = {
+    post(journey: string, body: unknown, options: Record<string, unknown>) {
+      calls.push({ journey, body, options });
+      return implementation(journey, body, options);
     },
-    async (input, init) => {
-      requests.push({ input: String(input), init });
-      return new Response(null, { status: 200 });
-    },
-  );
+  } as unknown as HttpClient;
+  return { http, calls };
+}
+
+test('submission sends credentials through HttpClient without manual telemetry headers', async () => {
+  const { http, calls } = httpWith(() => of(new HttpResponse({ status: 200 })));
+  const service = new ConversionDemoService(http);
 
   const result = await service.submit('/api/auth/login', 'demo@example.test', 'demo-password');
 
-  assert.deepEqual(conversionCalls, [{
-    journey: '/api/auth/login',
-    properties: { form: 'login' },
-  }]);
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0]?.input, '/api/auth/login');
-  assert.equal(requests[0]?.init?.method, 'POST');
-  assert.deepEqual(requests[0]?.init?.headers, {
-    ...conversionHeaders,
-    'Content-Type': 'application/json',
-  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]?.journey, '/api/auth/login');
+  assert.deepEqual(calls[0]?.body, { email: 'demo@example.test', password: 'demo-password' });
+  assert.equal(calls[0]?.options['observe'], 'response');
+  assert.equal(calls[0]?.options['headers'], undefined);
   assert.deepEqual(result, { status: 200, message: 'Сервер принял запрос.' });
-
-  const body = JSON.parse(String(requests[0]?.init?.body));
-  assert.deepEqual(body, { email: 'demo@example.test', password: 'demo-password' });
-  assert.equal(body.pulse, undefined, 'the body must not contain an additional plaintext timestamp');
 });
 
-test('register uses its own action path and form property', async () => {
-  const journeys: string[] = [];
-  const service = new ConversionDemoService(
-    {
-      getConversionHeaders: async (journey) => {
-        journeys.push(journey);
-        return conversionHeaders;
-      },
-    },
-    async () => new Response(null, { status: 200 }),
-  );
+test('register uses its own action path without a special telemetry property', async () => {
+  const { http, calls } = httpWith(() => of(new HttpResponse({ status: 200 })));
+  const service = new ConversionDemoService(http);
 
   await service.submit('/api/auth/register', 'demo@example.test', 'demo-password');
-  assert.deepEqual(journeys, ['/api/auth/register']);
+
+  assert.deepEqual(calls.map((call) => call.journey), ['/api/auth/register']);
+  assert.deepEqual(calls[0]?.body, { email: 'demo@example.test', password: 'demo-password' });
 });
 
-test('a rejected response exposes only a generic result', async () => {
-  const service = new ConversionDemoService(
-    { getConversionHeaders: async () => conversionHeaders },
-    async () => new Response('sensitive server detail', { status: 403 }),
-  );
+test('an HTTP rejection exposes only a generic result', async () => {
+  const { http } = httpWith(() => throwError(() => new HttpErrorResponse({
+    status: 403,
+    error: 'sensitive server detail',
+  })));
+  const service = new ConversionDemoService(http);
 
-  const result = await service.submit('/api/auth/login', 'demo@example.test', 'demo-password');
+  const result = await service.submit('/api/auth/login', 'a@b.test', 'secret');
+
   assert.deepEqual(result, { status: 403, message: 'Сервер отклонил запрос.' });
   assert.doesNotMatch(result.message, /sensitive/);
 });
 
-test('default fetch keeps the browser global receiver', async () => {
-  const originalFetch = globalThis.fetch;
-  let calls = 0;
-  try {
-    globalThis.fetch = async function (input, init) {
-      assert.strictEqual(this, globalThis, 'fetch must not be bound to ConversionDemoService');
-      calls += 1;
-      return new Response(null, { status: 200 });
-    };
-    const service = new ConversionDemoService({
-      getConversionHeaders: async () => conversionHeaders,
-    });
+test('network failures remain observable to the component', async () => {
+  const { http } = httpWith(() => throwError(() => new HttpErrorResponse({ status: 0 })));
+  const service = new ConversionDemoService(http);
 
-    await service.submit('/api/auth/login', 'demo@example.test', 'demo-password');
-    assert.equal(calls, 1);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test('network and conversion failures remain observable to the component', async () => {
-  const networkService = new ConversionDemoService(
-    { getConversionHeaders: async () => conversionHeaders },
-    async () => { throw new Error('offline'); },
+  await assert.rejects(
+    service.submit('/api/auth/login', 'a@b.test', 'secret'),
+    (error: unknown) => error instanceof HttpErrorResponse && error.status === 0,
   );
-  await assert.rejects(networkService.submit('/api/auth/login', 'a@b.test', 'secret'), /offline/);
-
-  const conversionService = new ConversionDemoService(
-    { getConversionHeaders: async () => { throw new Error('pixel unavailable'); } },
-    async () => new Response(null, { status: 200 }),
-  );
-  await assert.rejects(conversionService.submit('/api/auth/login', 'a@b.test', 'secret'), /pixel unavailable/);
 });

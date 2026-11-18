@@ -72,6 +72,7 @@ for (const variant of ['embedded', 'lazy']) {
     exports: manifest.exports,
     files: ['dist'],
     sideEffects: false,
+    peerDependencies: manifest.peerDependencies,
   };
   writeFileSync(resolve(staging, 'package.json'), `${JSON.stringify(releaseManifest, null, 2)}\n`);
 

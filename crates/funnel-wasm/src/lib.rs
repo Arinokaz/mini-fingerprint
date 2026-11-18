@@ -21,7 +21,7 @@ pub fn calculate_funnel_score(
     use crate::codec::CanonicalProperties;
     use crate::frame::Frame;
     use crate::journey::JourneyContext;
-    use crate::pulse::{pulse_to_hex, select_window};
+    use crate::pulse::pulse_to_hex;
     use crate::stages::stages_v1;
     use crate::touchpoint::current_touchpoint;
     use serde_json::{json, Value};
@@ -35,8 +35,7 @@ pub fn calculate_funnel_score(
         return Err(JsValue::from_str("runtime clock unavailable"));
     }
     let now_seconds = (now_milliseconds / 1000.0) as u64;
-    let selected_window = select_window(now_seconds);
-    let context = JourneyContext::new(journey, &current_touchpoint(), properties, selected_window)
+    let context = JourneyContext::new(journey, &current_touchpoint(), properties, now_seconds)
         .map_err(|_| JsValue::from_str("unsupported conversion context"))?;
 
     let mut frame = Frame::from_journey(context.journey())

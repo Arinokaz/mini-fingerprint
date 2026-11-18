@@ -56,7 +56,7 @@ impl FunnelStage for PropertiesStage {
     }
 }
 
-/// Поглощает encoded words и decoded window, который они представляют.
+/// Поглощает encoded words и decoded timestamp, который они представляют.
 struct PulseStage;
 
 impl FunnelStage for PulseStage {
@@ -65,7 +65,7 @@ impl FunnelStage for PulseStage {
         let mut payload = Vec::with_capacity(16);
         payload.extend_from_slice(&out0.to_le_bytes());
         payload.extend_from_slice(&out1.to_le_bytes());
-        payload.extend_from_slice(&context.selected_window().to_le_bytes());
+        payload.extend_from_slice(&context.timestamp().to_le_bytes());
         absorb(frame, 0xe3, &payload, 8);
         settle_frame(frame, 0xe3, 8);
     }

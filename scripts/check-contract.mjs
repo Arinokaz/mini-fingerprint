@@ -13,8 +13,6 @@ const fixtureUrl = new URL('../tests/fixtures/conversion-v1.json', import.meta.u
 const fixture = JSON.parse(await readFile(fixtureUrl, 'utf8'));
 
 assert.equal(fixture.profile, 'cv1', 'The only MVP profile must be cv1.');
-assert.equal(fixture.intervalSeconds, 180, 'The MVP interval must be 180 seconds.');
-assert.equal(fixture.boundarySeconds, 15, 'The MVP boundary must be 15 seconds.');
 assert.equal(fixture.constants.initial.length, 8, 'Exactly eight initial lanes are required.');
 assert.equal(fixture.constants.multipliers.length, 8, 'Exactly eight multipliers are required.');
 assert.equal(fixture.constants.additives.length, 8, 'Exactly eight additives are required.');
@@ -35,15 +33,9 @@ for (const testCase of fixture.cases) {
 
   assert.match(testCase.score, /^[0-9a-f]{64}$/, `${testCase.name}: malformed score.`);
   assert.match(testCase.pulse, /^[0-9a-f]{16}$/, `${testCase.name}: malformed pulse.`);
-  assert.equal(testCase.decodedWindow, testCase.selectedWindow, `${testCase.name}: pulse is not reversible.`);
+  assert.equal(testCase.decodedTimestamp, testCase.selectedTimestamp, `${testCase.name}: pulse is not reversible.`);
   assert.equal(typeof testCase.expectedServerMatch, 'boolean', `${testCase.name}: missing server expectation.`);
-
-  const currentWindow = Math.floor(testCase.now / fixture.intervalSeconds) * fixture.intervalSeconds;
-  const currentWindowEnd = currentWindow + fixture.intervalSeconds;
-  const expectedWindow = currentWindowEnd - testCase.now < fixture.boundarySeconds
-    ? currentWindowEnd
-    : currentWindow;
-  assert.equal(testCase.selectedWindow, expectedWindow, `${testCase.name}: incorrect selected window.`);
+  assert.equal(testCase.selectedTimestamp, testCase.now, `${testCase.name}: timestamp must use the exact request second.`);
 
   const pairs = JSON.parse(testCase.canonicalPropertiesJson);
   assert.ok(Array.isArray(pairs), `${testCase.name}: canonical properties must be an array.`);

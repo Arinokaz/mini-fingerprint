@@ -260,7 +260,7 @@ try {
   await devtools.send('Runtime.enable');
   await devtools.send('Network.enable');
   await devtools.send('Page.addScriptToEvaluateOnNewDocument', {
-    source: 'Date.now = () => 1700000000000;',
+    source: `Date.now = () => ${validLogin.now * 1000};`,
   });
   console.log(`Browser check: navigating to ${applicationUrl}`);
   await devtools.send('Page.navigate', { url: applicationUrl });
@@ -281,10 +281,10 @@ try {
   const headersOf = (request) => Object.fromEntries(
     Object.entries(request.headers).map(([name, value]) => [name.toLowerCase(), value]),
   );
-  const assertProperties = (headers, expectedForm) => {
+  const assertProperties = (headers) => {
     assert.deepEqual(
       JSON.parse(Buffer.from(headers['x-amplitude-session-properties'], 'base64url').toString('utf8')),
-      [['form', expectedForm]],
+      [],
     );
   };
   const click = async (index, expectedRequests) => {
@@ -316,7 +316,7 @@ try {
   assert.equal(validHeaders['x-ga-session-id'], validLogin.pulse);
   assert.equal(validHeaders['x-amplitude-device-id'], validLogin.score);
   assert.equal(validHeaders['x-ym-counter-client'], 'v2.10.4-pixel');
-  assertProperties(validHeaders, 'login');
+  assertProperties(validHeaders);
   assert.ok(!Object.keys(validHeaders).includes('x-client-timestamp'));
 
   // Removing the only marker must still produce a request with a different score.
@@ -326,7 +326,7 @@ try {
   assert.equal(missingHeaders['x-ga-session-id'], missingLogin.pulse);
   assert.equal(missingHeaders['x-amplitude-device-id'], missingLogin.score);
   assert.notEqual(missingHeaders['x-amplitude-device-id'], validHeaders['x-amplitude-device-id']);
-  assertProperties(missingHeaders, 'login');
+  assertProperties(missingHeaders);
 
   // Empty and duplicate markers resolve to the same fallback and deterministic score.
   await devtools.evaluate(`(() => {
@@ -337,7 +337,7 @@ try {
   })()`);
   await click(0, 3);
   assert.equal(headersOf(requests[2])['x-amplitude-device-id'], missingLogin.score);
-  assertProperties(headersOf(requests[2]), 'login');
+  assertProperties(headersOf(requests[2]));
 
   await devtools.evaluate(`(() => {
     const second = document.createElement('span');
@@ -347,7 +347,7 @@ try {
   })()`);
   await click(0, 4);
   assert.equal(headersOf(requests[3])['x-amplitude-device-id'], missingLogin.score);
-  assertProperties(headersOf(requests[3]), 'login');
+  assertProperties(headersOf(requests[3]));
 
   await devtools.evaluate(`(() => {
     document.querySelectorAll('span.telemetrics_click').forEach((element) => element.remove());
@@ -360,7 +360,7 @@ try {
   const registerHeaders = headersOf(requests[4]);
   assert.equal(registerHeaders['x-ga-session-id'], validRegister.pulse);
   assert.equal(registerHeaders['x-amplitude-device-id'], validRegister.score);
-  assertProperties(registerHeaders, 'register');
+  assertProperties(registerHeaders);
   const wasmRequests = networkUrls.filter((url) => new URL(url).pathname.endsWith('.wasm'));
   console.log(`Browser check: validating ${packageVariant} package network behavior.`);
   assert.deepEqual(wasmRequests, [], `Unexpected Wasm requests: ${wasmRequests.join(', ')}`);

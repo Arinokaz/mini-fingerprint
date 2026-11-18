@@ -99,9 +99,9 @@ function canonicalBytes(sortedPairs):
 K0 = 0xa53c9e17; K1 = 0x6d2b79f5
 C0 = 0x9e3779b9; C1 = 0x7f4a7c15
 
-function encode(window):
-    a = low32(window) XOR K0
-    b = high32(window) XOR K1
+function encode(timestamp):
+    a = low32(timestamp) XOR K0
+    b = high32(timestamp) XOR K1
     c = add32(a, rotateLeft32(b, 7))
     d = b
     e = c
@@ -119,17 +119,17 @@ function decode(parts):
     high = b XOR K1
     return low OR (high leftShift 32)
 
-function acceptedWindow(window, serverTime):
-    current = floor(serverTime / 180) * 180
-    return window equals one of [current-180, current, current+180]
+function acceptedTimestamp(timestamp, serverTime, maxPastSeconds = 30, maxFutureSeconds = 5):
+    return timestamp >= serverTime - maxPastSeconds
+        AND timestamp <= serverTime + maxFutureSeconds
 
 function parseAndCheck(pulseHex, serverTime):
     require pulseHex matches /^[0-9a-f]{16}$/
     parts = readTwoLittleEndianU32(pulseHex)
-    window = decode(parts)
-    require encode(window) == parts
-    require acceptedWindow(window, serverTime)
-    return [window, parts]
+    timestamp = decode(parts)
+    require encode(timestamp) == parts
+    require acceptedTimestamp(timestamp, serverTime)
+    return [timestamp, parts]
 ```
 
 ## 5. Стадии и FrameReducer
@@ -149,7 +149,7 @@ PropertiesStage:
     return absorb(frame, 0xd9, payload, rounds=4)
 
 PulseStage:
-    payload = littleEndian32(out0) + littleEndian32(out1) + littleEndian64(window)
+    payload = littleEndian32(out0) + littleEndian32(out1) + littleEndian64(timestamp)
     return absorb(frame, 0xe3, payload, rounds=8)
 ```
 
@@ -192,7 +192,7 @@ function matches(profile, journey, pulse, score, propertiesJson, serverTime) -> 
         require profile == "cv1"
         require journey is valid absolute API path of <= 512 bytes
         require score matches /^[0-9a-f]{64}$/
-        [window, parts] = PulseCodec.parseAndCheck(pulse, serverTime)
+        [timestamp, parts] = PulseCodec.parseAndCheck(pulse, serverTime)
         properties = PropertyCodec.parse(propertiesJson)
         require PropertyCodec.canonicalJson(properties) == propertiesJson
 
@@ -200,7 +200,7 @@ function matches(profile, journey, pulse, score, propertiesJson, serverTime) -> 
             journey = actualServerRoute,       // Не путь из тела запроса.
             expectedServerTag = env TELEMETRY_TAG,
             properties = properties,
-            window = window,
+            timestamp = timestamp,
             pulseParts = parts
         )
         require journey == context.journey
@@ -227,5 +227,5 @@ HTTP-слой позднее будет только читать заголов
 4. Fallback-fixtures не проходят с ожидаемым настоящим `TELEMETRY_TAG`.
 5. Изменение пути, свойства, тега, времени или одного hex-символа даёт `false`.
 6. Некорректные hex, JSON, base64url, дубли и превышение лимитов дают `false` без warnings.
-7. Предыдущее/текущее/следующее окна принимаются, остальные отклоняются.
+7. Timestamp ровно на границах past=30/future=5 принимается; более старый и более далёкий будущий отклоняются.
 8. Differential-тест на одинаковых случайных входах сравнивает Rust и PHP после каждой стадии.

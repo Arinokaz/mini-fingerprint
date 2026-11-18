@@ -12,7 +12,7 @@ export function withoutEmbeddedPayload(source) {
  * Проверяются JS и declarations после удаления base64-литералов.
  */
 export function assertNeutralArtifact(source, path) {
-  const text = withoutEmbeddedPayload(source);
+  const text = withoutEmbeddedPayload(source).replace(/\bInjectionToken\b/g, '');
   assert.ok(!text.includes('/*') && !text.includes('*/'), `${path}: comments must be stripped`);
   assert.ok(!text.includes('sourceMappingURL'), `${path}: source map reference must be stripped`);
   assert.ok(!bannedTerms.test(text), `${path}: sensitive implementation terminology must stay out`);

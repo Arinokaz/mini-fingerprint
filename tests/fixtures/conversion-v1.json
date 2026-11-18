@@ -1,7 +1,5 @@
 {
   "profile": "cv1",
-  "intervalSeconds": 180,
-  "boundarySeconds": 15,
   "constants": {
     "initial": [
       "243f6a88",
@@ -148,10 +146,8 @@
       ],
       "canonicalPropertiesJson": "[[\"a.first\",\"value:with:colon\"],[\"empty\",\"\"],[\"z.last\",\"привет\"]]",
       "canonicalPropertiesHex": "07000000612e66697273741000000076616c75653a776974683a636f6c6f6e05000000656d70747900000000060000007a2e6c6173740c000000d0bfd180d0b8d0b2d0b5d182",
-      "now": 1700000000,
-      "selectedWindow": 1699999920,
+      "now": 1699999920,
       "pulse": "e4101bc8af581d85",
-      "decodedWindow": 1699999920,
       "stages": {
         "journey": [
           "3cd54917",
@@ -195,10 +191,12 @@
         ]
       },
       "score": "7ab7690b65608301ead4b8d97f59df79a308d38c2c55820e7f56b209f9431f4f",
-      "expectedServerMatch": true
+      "expectedServerMatch": true,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920
     },
     {
-      "name": "register-boundary-14",
+      "name": "register-timestamp-next",
       "journey": "/api/auth/register",
       "anchorState": "valid",
       "observedTag": "register-build-2026.11",
@@ -215,10 +213,8 @@
       ],
       "canonicalPropertiesJson": "[[\"form\",\"register\"],[\"locale\",\"ru-RU\"]]",
       "canonicalPropertiesHex": "04000000666f726d080000007265676973746572060000006c6f63616c650500000072752d5255",
-      "now": 1700000086,
-      "selectedWindow": 1700000100,
+      "now": 1700000100,
       "pulse": "90131bc8afd83a85",
-      "decodedWindow": 1700000100,
       "stages": {
         "journey": [
           "c1ee5c1b",
@@ -262,10 +258,12 @@
         ]
       },
       "score": "1d5745731dbb2b5c12f933cfc99e8edac7dd82963d1c7c4fee3fc495fcf0165b",
-      "expectedServerMatch": true
+      "expectedServerMatch": true,
+      "selectedTimestamp": 1700000100,
+      "decodedTimestamp": 1700000100
     },
     {
-      "name": "register-boundary-15",
+      "name": "register-timestamp-current",
       "journey": "/api/auth/register",
       "anchorState": "valid",
       "observedTag": "register-build-2026.11",
@@ -282,10 +280,8 @@
       ],
       "canonicalPropertiesJson": "[[\"form\",\"register\"],[\"locale\",\"ru-RU\"]]",
       "canonicalPropertiesHex": "04000000666f726d080000007265676973746572060000006c6f63616c650500000072752d5255",
-      "now": 1700000085,
-      "selectedWindow": 1699999920,
+      "now": 1699999920,
       "pulse": "e4101bc8af581d85",
-      "decodedWindow": 1699999920,
       "stages": {
         "journey": [
           "c1ee5c1b",
@@ -329,7 +325,9 @@
         ]
       },
       "score": "655aa4cb8bcfe1a6187520d138fe56ef39d52b6a709e2c1614d1412eab72571b",
-      "expectedServerMatch": true
+      "expectedServerMatch": true,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920
     },
     {
       "name": "login-missing-anchor",
@@ -353,10 +351,8 @@
       ],
       "canonicalPropertiesJson": "[[\"a.first\",\"value:with:colon\"],[\"empty\",\"\"],[\"z.last\",\"привет\"]]",
       "canonicalPropertiesHex": "07000000612e66697273741000000076616c75653a776974683a636f6c6f6e05000000656d70747900000000060000007a2e6c6173740c000000d0bfd180d0b8d0b2d0b5d182",
-      "now": 1700000000,
-      "selectedWindow": 1699999920,
+      "now": 1699999920,
       "pulse": "e4101bc8af581d85",
-      "decodedWindow": 1699999920,
       "stages": {
         "journey": [
           "3cd54917",
@@ -400,7 +396,9 @@
         ]
       },
       "score": "09ed8c78939e6835937fed9945ce7e40e8b28ee0645d52a1f66d9d2f6344dc77",
-      "expectedServerMatch": false
+      "expectedServerMatch": false,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920
     },
     {
       "name": "login-empty-anchor",
@@ -424,10 +422,8 @@
       ],
       "canonicalPropertiesJson": "[[\"a.first\",\"value:with:colon\"],[\"empty\",\"\"],[\"z.last\",\"привет\"]]",
       "canonicalPropertiesHex": "07000000612e66697273741000000076616c75653a776974683a636f6c6f6e05000000656d70747900000000060000007a2e6c6173740c000000d0bfd180d0b8d0b2d0b5d182",
-      "now": 1700000000,
-      "selectedWindow": 1699999920,
+      "now": 1699999920,
       "pulse": "e4101bc8af581d85",
-      "decodedWindow": 1699999920,
       "stages": {
         "journey": [
           "3cd54917",
@@ -471,7 +467,9 @@
         ]
       },
       "score": "09ed8c78939e6835937fed9945ce7e40e8b28ee0645d52a1f66d9d2f6344dc77",
-      "expectedServerMatch": false
+      "expectedServerMatch": false,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920
     },
     {
       "name": "login-duplicate-anchor",
@@ -495,10 +493,8 @@
       ],
       "canonicalPropertiesJson": "[[\"a.first\",\"value:with:colon\"],[\"empty\",\"\"],[\"z.last\",\"привет\"]]",
       "canonicalPropertiesHex": "07000000612e66697273741000000076616c75653a776974683a636f6c6f6e05000000656d70747900000000060000007a2e6c6173740c000000d0bfd180d0b8d0b2d0b5d182",
-      "now": 1700000000,
-      "selectedWindow": 1699999920,
+      "now": 1699999920,
       "pulse": "e4101bc8af581d85",
-      "decodedWindow": 1699999920,
       "stages": {
         "journey": [
           "3cd54917",
@@ -542,7 +538,9 @@
         ]
       },
       "score": "09ed8c78939e6835937fed9945ce7e40e8b28ee0645d52a1f66d9d2f6344dc77",
-      "expectedServerMatch": false
+      "expectedServerMatch": false,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920
     },
     {
       "name": "login-production-valid",
@@ -550,18 +548,11 @@
       "anchorState": "valid",
       "observedTag": "production-build-tag",
       "selectedTag": "production-build-tag",
-      "inputProperties": [
-        [
-          "form",
-          "login"
-        ]
-      ],
-      "canonicalPropertiesJson": "[[\"form\",\"login\"]]",
-      "canonicalPropertiesHex": "04000000666f726d050000006c6f67696e",
-      "now": 1700000000,
-      "selectedWindow": 1699999920,
+      "inputProperties": [],
+      "canonicalPropertiesJson": "[]",
+      "canonicalPropertiesHex": "",
+      "now": 1699999920,
       "pulse": "e4101bc8af581d85",
-      "decodedWindow": 1699999920,
       "stages": {
         "journey": [
           "3cd54917",
@@ -584,28 +575,30 @@
           "579fe3bf"
         ],
         "properties": [
-          "7ae078a3",
-          "c818a626",
-          "6420fdcd",
-          "984da61d",
-          "5b8f2aef",
-          "4223165e",
-          "6b50884b",
-          "bf97fdfc"
+          "ad973209",
+          "05ccf36b",
+          "8c8e7c51",
+          "56ddeef2",
+          "9fe18396",
+          "8c093576",
+          "97398a1e",
+          "98ef212c"
         ],
         "pulse": [
-          "c0d7b4e4",
-          "0e76053c",
-          "1bd214c1",
-          "46930592",
-          "eac67ae4",
-          "a94a3a7a",
-          "980e0e10",
-          "0e7bf8fe"
+          "58805bb5",
+          "89f57172",
+          "96018658",
+          "7f608084",
+          "7512d216",
+          "092ab615",
+          "0c57e06b",
+          "f20fcad1"
         ]
       },
-      "score": "e4b4d7c03c05760ec114d21b92059346e47ac6ea7a3a4aa9100e0e98fef87b0e",
-      "expectedServerMatch": true
+      "score": "b55b80587271f589588601968480607f16d2127515b62a096be0570cd1ca0ff2",
+      "expectedServerMatch": true,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920
     },
     {
       "name": "login-production-missing",
@@ -613,18 +606,11 @@
       "anchorState": "missing",
       "observedTag": null,
       "selectedTag": "telemetry.unresolved.v1",
-      "inputProperties": [
-        [
-          "form",
-          "login"
-        ]
-      ],
-      "canonicalPropertiesJson": "[[\"form\",\"login\"]]",
-      "canonicalPropertiesHex": "04000000666f726d050000006c6f67696e",
-      "now": 1700000000,
-      "selectedWindow": 1699999920,
+      "inputProperties": [],
+      "canonicalPropertiesJson": "[]",
+      "canonicalPropertiesHex": "",
+      "now": 1699999920,
       "pulse": "e4101bc8af581d85",
-      "decodedWindow": 1699999920,
       "stages": {
         "journey": [
           "3cd54917",
@@ -647,28 +633,30 @@
           "9effa399"
         ],
         "properties": [
-          "c572ce5c",
-          "7371d84d",
-          "a211d9b1",
-          "9ce7d9d9",
-          "53dee915",
-          "0cbbd2fa",
-          "bb5c7c00",
-          "537749ec"
+          "3f6b680b",
+          "1ffb21f0",
+          "36c32a85",
+          "441794d7",
+          "e40a602e",
+          "8a37bafb",
+          "290c64c2",
+          "aabbbebf"
         ],
         "pulse": [
-          "34d61cf2",
-          "eb76b232",
-          "205463bf",
-          "d4f2b7b1",
-          "88efa7c7",
-          "4fcd9077",
-          "735c3641",
-          "b9e24051"
+          "0243da22",
+          "5c8fcf33",
+          "a9b0b4bc",
+          "06ddd5bb",
+          "ec89276e",
+          "156688e6",
+          "5f8931ba",
+          "37fb53f8"
         ]
       },
-      "score": "f21cd63432b276ebbf635420b1b7f2d4c7a7ef887790cd4f41365c735140e2b9",
-      "expectedServerMatch": false
+      "score": "22da430233cf8f5cbcb4b0a9bbd5dd066e2789ece6886615ba31895ff853fb37",
+      "expectedServerMatch": false,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920
     },
     {
       "name": "register-production-valid",
@@ -676,18 +664,11 @@
       "anchorState": "valid",
       "observedTag": "production-build-tag",
       "selectedTag": "production-build-tag",
-      "inputProperties": [
-        [
-          "form",
-          "register"
-        ]
-      ],
-      "canonicalPropertiesJson": "[[\"form\",\"register\"]]",
-      "canonicalPropertiesHex": "04000000666f726d080000007265676973746572",
-      "now": 1700000000,
-      "selectedWindow": 1699999920,
+      "inputProperties": [],
+      "canonicalPropertiesJson": "[]",
+      "canonicalPropertiesHex": "",
+      "now": 1699999920,
       "pulse": "e4101bc8af581d85",
-      "decodedWindow": 1699999920,
       "stages": {
         "journey": [
           "c1ee5c1b",
@@ -710,28 +691,30 @@
           "1a335249"
         ],
         "properties": [
-          "9efe7db6",
-          "584ff946",
-          "3d235f53",
-          "09267085",
-          "46afd16c",
-          "cebc9029",
-          "1fe6ab5a",
-          "9431da7e"
+          "7cdbb18e",
+          "96651dab",
+          "55953d40",
+          "016e6152",
+          "185cf987",
+          "7ecb0419",
+          "556d340e",
+          "b26f1a18"
         ],
         "pulse": [
-          "eae55b29",
-          "062d7593",
-          "30a72bd1",
-          "ec2b9872",
-          "afcdbaee",
-          "df8432d7",
-          "2cd5836f",
-          "dbd6bac8"
+          "0f39a71b",
+          "568c7b05",
+          "a2d911c6",
+          "526ea8ca",
+          "f610f715",
+          "502cf0d0",
+          "2479c4eb",
+          "622ad4e5"
         ]
       },
-      "score": "295be5ea93752d06d12ba73072982beceebacdafd73284df6f83d52cc8bad6db",
-      "expectedServerMatch": true
+      "score": "1ba7390f057b8c56c611d9a2caa86e5215f710f6d0f02c50ebc47924e5d42a62",
+      "expectedServerMatch": true,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920
     }
   ]
 }

@@ -27,7 +27,7 @@ fn every_stage_matches_the_independent_golden_frames() {
             case["journey"].as_str().unwrap(),
             case["selectedTag"].as_str().unwrap(),
             properties,
-            case["selectedWindow"].as_u64().unwrap(),
+            case["selectedTimestamp"].as_u64().unwrap(),
         )
         .unwrap();
         let mut frame = Frame::from_journey(context.journey()).unwrap();
@@ -57,7 +57,7 @@ fn native_stage_pipeline_stays_within_the_mvp_time_budget() {
         case["journey"].as_str().unwrap(),
         case["selectedTag"].as_str().unwrap(),
         properties,
-        case["selectedWindow"].as_u64().unwrap(),
+        case["selectedTimestamp"].as_u64().unwrap(),
     )
     .unwrap();
     let mut durations = Vec::with_capacity(201);
@@ -90,7 +90,7 @@ fn repeated_application_uses_no_hidden_global_state() {
         case["journey"].as_str().unwrap(),
         case["selectedTag"].as_str().unwrap(),
         properties,
-        case["selectedWindow"].as_u64().unwrap(),
+        case["selectedTimestamp"].as_u64().unwrap(),
     )
     .unwrap();
 
