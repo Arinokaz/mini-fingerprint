@@ -13,20 +13,16 @@
     }
   },
   "files": [
-    "dist",
-    "pkg/funnel_wasm.js",
-    "pkg/funnel_wasm.d.ts",
-    "pkg/funnel_wasm_bg.wasm.d.ts",
-    "pkg/package.json",
-    "pkg/.npmignore"
+    "dist"
   ],
   "sideEffects": false,
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
-    "build": "tsc -p tsconfig.json"
+    "build": "node scripts/build.mjs --variant embedded --out-dir dist"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "esbuild": "^0.28.2",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0"
   }
