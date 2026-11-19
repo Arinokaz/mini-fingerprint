@@ -25,11 +25,16 @@ function browserEnvironment() {
     },
     addEventListener: () => undefined,
   };
+  const storage = new Map<string, string>();
   const window = {
     innerWidth: 1280,
     innerHeight: 720,
     devicePixelRatio: 1,
-    localStorage: { setItem: () => undefined, removeItem: () => undefined },
+    localStorage: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value); },
+      removeItem: (key: string) => { storage.delete(key); },
+    },
   };
   const navigator = {
     language: 'ru-RU',
@@ -59,6 +64,7 @@ function browserEnvironment() {
   return {
     canvas,
     document,
+    storage,
     restore() {
       Date.now = originalNow;
       Math.random = originalRandom;
@@ -129,6 +135,18 @@ test('facade сохраняет полный analytics envelope при отсу�
     assert.equal(headers['X-PA-Measurement-Id'], 'pa1');
     assert.match(headers['X-PA-Device-Id'], /^[0-9a-f]{32}$/);
     assert.equal(snapshot.screen, '1920x1080');
+  } finally {
+    environment.restore();
+  }
+});
+
+test('capability probe сохраняет существующее значение storage', async () => {
+  const environment = browserEnvironment();
+  environment.storage.set('pa.capability', 'application-value');
+  try {
+    const sdk = new ProductAnalytics();
+    await sdk.getEngagementHeaders('/api/auth/login');
+    assert.equal(environment.storage.get('pa.capability'), 'application-value');
   } finally {
     environment.restore();
   }

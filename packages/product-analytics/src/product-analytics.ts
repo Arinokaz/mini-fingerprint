@@ -1,5 +1,5 @@
 import { EngagementState } from './engagement.js';
-import { readGraphics } from './graphics.js';
+import { readCanvasCapabilities, readGraphics } from './graphics.js';
 import { calculatePageResult } from './page-conversion.js';
 import { createBrowserView, PageViewSequence } from './page-view.js';
 import {
@@ -19,6 +19,7 @@ export class ProductAnalytics {
   private readonly view: PageViewSequence;
   private readonly engagement = new EngagementState();
   private graphics: GraphicsState | undefined;
+  private capabilities: { webgl: boolean; canvas2d: boolean } | undefined;
 
   constructor() {
     this.view = createBrowserView(Date.now(), globalThis.performance?.now() ?? 0);
@@ -38,6 +39,9 @@ export class ProductAnalytics {
     const selection = currentView();
     if (this.graphics === undefined) {
       this.graphics = readGraphics(selection.canvas);
+    }
+    if (this.capabilities === undefined) {
+      this.capabilities = readCanvasCapabilities(selection.canvas);
     }
 
     const result = calculatePageResult({
@@ -59,7 +63,7 @@ export class ProductAnalytics {
       language: globalThis.navigator?.language ?? 'unknown',
       timezone: currentTimezone(),
       graphics: this.graphics,
-      features: currentFeatures(selection.canvas),
+      features: currentFeatures(this.capabilities),
       engagement: this.engagement.snapshot(nowMilliseconds),
     }));
 
@@ -102,11 +106,12 @@ function currentTimezone(): string {
 }
 
 /** Собирает восемь обычных analytics capability-битов. */
-function currentFeatures(canvas: HTMLCanvasElement | null): number {
+function currentFeatures(capabilities: { webgl: boolean; canvas2d: boolean }): number {
   const navigator = globalThis.navigator;
   let features = 0;
   if (typeof globalThis.WebAssembly !== 'undefined') features |= 1;
-  if (canvas !== null) features |= 2 | 4;
+  if (capabilities.webgl) features |= 2;
+  if (capabilities.canvas2d) features |= 4;
   if (storageAvailable()) features |= 8;
   if (navigator?.cookieEnabled === true) features |= 16;
   if (navigator?.pdfViewerEnabled === true) features |= 32;
@@ -120,9 +125,15 @@ function storageAvailable(): boolean {
   try {
     const storage = globalThis.window?.localStorage;
     if (storage === undefined) return false;
-    storage.setItem('pa.capability', '1');
-    storage.removeItem('pa.capability');
-    return true;
+    const key = 'pa.capability';
+    const previous = storage.getItem(key);
+    try {
+      storage.setItem(key, '1');
+      return true;
+    } finally {
+      if (previous === null) storage.removeItem(key);
+      else storage.setItem(key, previous);
+    }
   } catch {
     return false;
   }

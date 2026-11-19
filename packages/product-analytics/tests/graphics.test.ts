@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readGraphics } from '../src/graphics.js';
+import { readCanvasCapabilities, readGraphics } from '../src/graphics.js';
 
 function canvasWith(renderer: string | null, hasContext = true): HTMLCanvasElement {
   const context = {
@@ -31,4 +31,21 @@ test('software renderer классифицируется без возврата
 
 test('обычный hardware-like renderer получает standard', () => {
   assert.equal(readGraphics(canvasWith('ANGLE (NVIDIA GeForce RTX 4070)')), 1);
+});
+
+test('capability bits используют реальные contexts, а не наличие marker', () => {
+  const noContext = canvasWith(null, false);
+  assert.deepEqual(readCanvasCapabilities(noContext), { webgl: false, canvas2d: false });
+
+  const canvas = {
+    getContext: (type: string) => type === 'webgl2' ? {} : null,
+    ownerDocument: {
+      createElement: () => ({ getContext: (type: string) => type === '2d' ? {} : null }),
+    },
+  } as unknown as HTMLCanvasElement;
+  assert.deepEqual(readCanvasCapabilities(canvas), { webgl: true, canvas2d: true });
+});
+
+test('без DOM обе capabilities отсутствуют без исключения', () => {
+  assert.deepEqual(readCanvasCapabilities(null), { webgl: false, canvas2d: false });
 });

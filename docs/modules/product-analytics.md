@@ -166,7 +166,7 @@ base64url properties <= 1400 chars
 все пять headers <= 2 KB
 ```
 
-Representative test snapshot занимает 206 raw bytes и 275 base64url chars. Минифицированный `dist/index.js` текущей сборки — 8970 bytes / 3931 gzip; сам `.tgz` — 5850 bytes. Это измеренный baseline, а не жёсткий лимит для каждой будущей версии.
+Representative test snapshot занимает 206 raw bytes и 275 base64url chars. Минифицированный `dist/index.js` текущей сборки — 9560 bytes / 4117 gzip; сам `.tgz` — 6069 bytes. Это измеренный baseline, а не жёсткий лимит для каждой будущей версии.
 
 ## 7. Ошибки и совместная работа с Wasm
 

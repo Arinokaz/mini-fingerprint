@@ -15,7 +15,7 @@ class Target {
 }
 
 test('пустое состояние и возраст view имеют точные buckets', () => {
-  const state = new EngagementState(0);
+  const state = new EngagementState(() => 0);
   const target = new Target();
   state.start(target as unknown as Document);
   assert.deepEqual(state.snapshot(999), [0, 0, 0, 0]);
@@ -26,7 +26,7 @@ test('пустое состояние и возраст view имеют точн
 });
 
 test('focus и visibility не создают qualifying активность', () => {
-  const state = new EngagementState(0);
+  const state = new EngagementState(() => 0);
   const target = new Target();
   state.start(target as unknown as Document);
   target.fire('focus');
@@ -39,7 +39,7 @@ test('focus и visibility не создают qualifying активность', 
 });
 
 test('input события задают категории и capped count buckets', () => {
-  const state = new EngagementState(0);
+  const state = new EngagementState(() => 0);
   const target = new Target();
   state.start(target as unknown as Document);
   target.fire('mousemove');
@@ -53,7 +53,7 @@ test('input события задают категории и capped count bucke
 });
 
 test('повторный start не сбрасывает состояние и не дублирует listeners', () => {
-  const state = new EngagementState(0);
+  const state = new EngagementState(() => 0);
   const target = new Target();
   state.start(target as unknown as Document);
   const additions = target.additions;
@@ -61,4 +61,13 @@ test('повторный start не сбрасывает состояние и �
   state.start(target as unknown as Document);
   assert.equal(target.additions, additions);
   assert.equal(state.snapshot(100)[1], 1);
+});
+
+test('возраст view начинается с первого start, а не с constructor', () => {
+  let now = 0;
+  const state = new EngagementState(() => now);
+  const target = new Target();
+  now = 60_000;
+  state.start(target as unknown as Document);
+  assert.deepEqual(state.snapshot(60_000), [0, 0, 0, 0]);
 });

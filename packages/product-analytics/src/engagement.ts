@@ -5,10 +5,11 @@ export class EngagementState {
   private started = false;
   private inputCount = 0;
   private categoryMask = 0;
-  private readonly startedAt: number;
+  private startedAt: number | undefined;
+  private readonly clock: () => number;
 
-  constructor(startedAt = Date.now()) {
-    this.startedAt = startedAt;
+  constructor(clock: () => number = Date.now) {
+    this.clock = clock;
   }
 
   /** Устанавливает listeners один раз; повторный вызов ничего не сбрасывает. */
@@ -17,6 +18,7 @@ export class EngagementState {
       return;
     }
     this.started = true;
+    this.startedAt = this.clock();
     this.listen(target, 'mousemove', 1, true);
     this.listen(target, 'keydown', 2, true);
     this.listen(target, 'touchstart', 4, true);
@@ -32,7 +34,7 @@ export class EngagementState {
       this.inputCount > 0 ? 1 : 0,
       this.inputCount === 0 ? 0 : this.inputCount === 1 ? 1 : this.inputCount <= 5 ? 2 : 3,
       this.categoryMask,
-      ageBucket(Math.max(0, nowMilliseconds - this.startedAt)),
+      ageBucket(this.startedAt === undefined ? 0 : Math.max(0, nowMilliseconds - this.startedAt)),
     ];
   }
 

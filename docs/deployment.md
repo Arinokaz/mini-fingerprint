@@ -264,7 +264,7 @@ Baseline текущей `cv2`-сборки: raw Wasm 87 267 байт, base64 116
 
 Release-проверка реального Wasm на Node.js 18 для default `"00"` зафиксировала за 201 вызов: median 0,204 ms и p95 0,819 ms. Это наблюдение на текущей машине, а не обещание для браузеров и слабых устройств. Не повышайте prefix без отдельного измерения median/p95 на целевых клиентах.
 
-Независимый product analytics `.tgz` — 5 850 bytes, а `dist/index.js` — 8 970 bytes / 3 931 gzip. Representative snapshot — 206 raw bytes и 275 base64url chars; protocol budget — 1024 raw bytes, 1400 base64url chars и не более 2 KB для всех пят pa1 headers.
+Независимый product analytics `.tgz` — 6 069 bytes, а `dist/index.js` — 9 560 bytes / 4 117 gzip. Representative snapshot — 206 raw bytes и 275 base64url chars; protocol budget — 1024 raw bytes, 1400 base64url chars и не более 2 KB для всех пят pa1 headers.
 
 ### 5.3. Проверка содержимого и поведения
 

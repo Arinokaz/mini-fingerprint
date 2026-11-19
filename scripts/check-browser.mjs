@@ -17,7 +17,7 @@ const browserRoot = process.env['DEMO_BROWSER_ROOT']
   : resolve(root, 'apps/demo-web/dist/demo-web/browser');
 const packageVariant = process.env['TELEMETRY_VARIANT'] ?? 'embedded';
 const productOnly = process.env['PRODUCT_ONLY'] === '1';
-console.log(`Browser check: requested variant=${packageVariant}; platform=${process.platform}.`);
+console.log(`Browser check: requested variant=${packageVariant}; mode=${productOnly ? 'product-only' : 'full'}; platform=${process.platform}.`);
 assert.ok(['embedded', 'lazy'].includes(packageVariant), `Unknown telemetry variant: ${packageVariant}`);
 const profileDirectory = resolve(tmpdir(), 'opencode', 'chrome-profile');
 
@@ -57,6 +57,7 @@ if (selectedWindowsBrowser && process.env['WSL_DISTRO_NAME'] && mayDelegate) {
     : { DEMO_BROWSER_ROOT: execFileSync('wslpath', ['-w', browserRoot], { encoding: 'utf8' }).trim() };
   const delegatedVariables = [
     'TELEMETRY_VARIANT/w',
+    ...(productOnly ? ['PRODUCT_ONLY/w'] : []),
     ...(process.env['DEMO_BROWSER_ROOT'] === undefined ? [] : ['DEMO_BROWSER_ROOT/w']),
   ];
   const result = spawnSync(windowsNode, [scriptPath], {
@@ -322,6 +323,8 @@ try {
     const snapshot = JSON.parse(Buffer.from(headers['x-pa-session-properties'], 'base64url').toString('utf8'));
     assert.equal(snapshot.viewId, testCase.viewId);
     assert.equal(snapshot.features & 1, productOnly ? 0 : 1);
+    assert.equal(snapshot.features & 4, 4, 'Canvas2D must use an independent real context');
+    assert.equal(snapshot.features & 2, snapshot.gfx === 3 ? 0 : 2, 'WebGL bit must match the actual context');
     assert.ok(Array.isArray(snapshot.engagement) && snapshot.engagement.length === 4);
   };
   const assertRequest = (headers, conversionCase, productCase) => {
@@ -367,7 +370,9 @@ try {
   await click(0, 2);
   const missingHeaders = headersOf(requests[1]);
   assertRequest(missingHeaders, missingLogin, productMissingLogin);
-  assert.notEqual(missingHeaders['x-amplitude-device-id'], validHeaders['x-amplitude-device-id']);
+  if (!productOnly) {
+    assert.notEqual(missingHeaders['x-amplitude-device-id'], validHeaders['x-amplitude-device-id']);
+  }
 
   // Empty and duplicate markers use the same fallback but distinct click sequences.
   await devtools.evaluate(`(() => {
