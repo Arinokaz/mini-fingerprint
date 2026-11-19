@@ -1,6 +1,7 @@
 //! Versioned frame-стадии и встроенные data-flow projections.
 
-use crate::frame::{add32, mul32, rotl32, sub32};
+use crate::click::ClickId;
+use crate::frame::{add32, mul32, rotl32, sub32, Frame};
 use crate::journey::JourneyContext;
 use crate::tables::{ADDITIVES, MULTIPLIERS, PERMUTATION, SUBSTITUTION};
 use std::hint::black_box;
@@ -20,6 +21,17 @@ pub fn stages_v1() -> Vec<Box<dyn FunnelStage>> {
         Box::new(JourneyStage),
         Box::new(TouchpointStage),
         Box::new(PropertiesStage),
+        Box::new(PulseStage),
+    ]
+}
+
+/// Создаёт пять стадий cv2 с отдельным clickId между properties и pulse.
+pub fn stages_v2(click_id: ClickId) -> Vec<Box<dyn FunnelStage>> {
+    vec![
+        Box::new(JourneyStage),
+        Box::new(TouchpointStage),
+        Box::new(PropertiesStage),
+        Box::new(ClickStage(click_id)),
         Box::new(PulseStage),
     ]
 }
@@ -56,6 +68,16 @@ impl FunnelStage for PropertiesStage {
     }
 }
 
+/// Поглощает шестнадцать little-endian байт текущего clickId.
+struct ClickStage(ClickId);
+
+impl FunnelStage for ClickStage {
+    fn apply(&self, frame: &mut [u32; 8], _context: &JourneyContext) {
+        absorb(frame, 0xc1, &self.0.to_le_bytes(), 4);
+        settle_frame(frame, 0xc1, 4);
+    }
+}
+
 /// Поглощает encoded words и decoded timestamp, который они представляют.
 struct PulseStage;
 
@@ -69,6 +91,19 @@ impl FunnelStage for PulseStage {
         absorb(frame, 0xe3, &payload, 8);
         settle_frame(frame, 0xe3, 8);
     }
+}
+
+/// Вычисляет неизменяемую часть cv2 до начала перебора clickId.
+pub(crate) fn apply_v2_prefix(frame: &mut Frame, context: &JourneyContext) {
+    JourneyStage.apply(frame.lanes_mut(), context);
+    TouchpointStage.apply(frame.lanes_mut(), context);
+    PropertiesStage.apply(frame.lanes_mut(), context);
+}
+
+/// Применяет только две стадии, зависящие от текущего clickId и исходного времени.
+pub(crate) fn apply_v2_tail(frame: &mut Frame, context: &JourneyContext, click_id: ClickId) {
+    ClickStage(click_id).apply(frame.lanes_mut(), context);
+    PulseStage.apply(frame.lanes_mut(), context);
 }
 
 /// Выполняет contract-defined byte absorption и заданное число diffuse rounds.
