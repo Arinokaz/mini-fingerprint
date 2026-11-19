@@ -1,6 +1,6 @@
 # Telemetry Wasm MVP
 
-Локальный MVP на Angular, TypeScript и Rust/Wasm. Клиентский API оформлен как маркетинговая телеметрия. Wasm получает API-путь, DOM-атрибут `span.telemetrics_click[data-tag]`, дополнительные свойства и текущее время. Независимая реализация зеркальной проверки на PHP 8.4 отложена; её псевдокод сохранён в документации.
+Локальный MVP на Angular, TypeScript и Rust/Wasm. Клиентский API оформлен как маркетинговая телеметрия. Angular interceptor передаёт в Wasm pathname HTTP-запроса и пустой набор дополнительных свойств; Wasm сам читает DOM-атрибут `span.telemetrics_click[data-tag]` и текущий Unix timestamp в секундах. Независимая реализация зеркальной проверки на PHP 8.4 отложена; её псевдокод сохранён в документации.
 
 > Проект повышает стоимость статического анализа, но не доказывает подлинность браузера. Это не криптографическая схема и не замена серверным ограничениям brute-force.
 
@@ -38,7 +38,7 @@
 
 ```text
 apps/demo-web/                    Angular demo
-packages/marketing-telemetry/     Локальный TypeScript NPM-пакет
+packages/marketing-telemetry/     Angular NPM-пакет с Rust/Wasm runtime
 crates/funnel-wasm/               Rust и браузерный Wasm-интерфейс
 docs/php-mirror-pseudocode.md     Псевдокод отложенной PHP-реализации
 contracts/conversion-v1.md       Нормативный протокол
@@ -54,7 +54,7 @@ node scripts/check-contract.mjs
 npm run check:contract
 ```
 
-Проверка валидирует структуру fixtures, границы временных окон, формат состояний и итоговых значений. Побитовое совпадение Rust с fixtures проверяется отдельным набором Rust-тестов.
+Проверка валидирует структуру fixtures, равенство входного и декодированного Unix timestamp, формат состояний и итоговых значений. Побитовое совпадение Rust с fixtures проверяется отдельным набором Rust-тестов.
 
 ## Фронтенд: сборка и проверка
 
@@ -78,6 +78,6 @@ PHP endpoints сейчас не реализованы. Browser-сервер н�
 
 ## Протокол в двух словах
 
-Восемь слов `u32` последовательно проходят этапы `journey`, `touchpoint`, `properties` и `pulse`. Результат — 256 бит в виде 64 строчных hex-символов. Временное окно кодируется обратимо и передаётся отдельно в виде 16 hex-символов. Никакие SHA, MD5 или HMAC не используются.
+Восемь слов `u32` последовательно проходят этапы `journey`, `touchpoint`, `properties` и `pulse`. Результат — 256 бит в виде 64 строчных hex-символов. Точный Unix timestamp в секундах кодируется обратимо и передаётся отдельно в виде 16 hex-символов. Временные окна и клиентский boundary buffer не используются. Никакие SHA, MD5 или HMAC не используются.
 
 Полное описание: [`contracts/conversion-v1.md`](contracts/conversion-v1.md). Будущая серверная часть: [`docs/php-mirror-pseudocode.md`](docs/php-mirror-pseudocode.md).

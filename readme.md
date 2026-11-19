@@ -1,5 +1,7 @@
 Тема: Предложение по защите публичных эндпоинтов (авторизация/регистрация) от ботов и ИИ-парсеров с использованием WebAssembly и многослойной валидации.
 
+> Это исходная архитектурная концепция. Актуальная реализация описана в `docs/architecture.md`, а обязательные правила вычислений — в `contracts/conversion-v1.md`. PHP-код ниже является концептуальным pseudocode, а не реализованным backend.
+
 Привет! Хочу обсудить критический риск и предложить архитектурное решение.
 Контекст проблемы:
 Сейчас наши публичные методы (логин, регистрация), которые не требуют авторизации, активно штурмуют боты. Самое неприятное — злоумышленники используют современные LLM (ИИ), которые за пару минут парсят наш скомпилированный Angular-бандл (index.js), вытаскивают структуру запросов и пишут точечные скрипты-эмуляторы. Базовые методы вроде скрытия URL или Rate Limiting по IP уже обходятся ботами через прокси-сетки.
@@ -56,7 +58,7 @@
 * **Фронтенд:** Angular (SPA) с динамическими DOM-элементами и асинхронным вызовом Wasm.
 * **Криптографическое ядро («Черный ящик»):** WebAssembly-модуль, написанный на **Rust** и скомпилированный в бинарный байт-код с жесткими флагами оптимизации.
 * **Бэкенд:** PHP 8.4 (высокая производительность, строгая типизация, проверка через `hash_equals()`).
-* **Контроль сессий:** Отказ от внешних состояний (Redis не требуется за счет использования детерминированных временных окон).
+* **Контроль сессий:** Отказ от внешних состояний (Redis не требуется за счет использования детерминированного Unix timestamp; сервер ограничивает его допустимый возраст).
 
 ---
 
@@ -66,7 +68,7 @@
 
 1. **Контекст браузера (`window.location`):** Динамическое считывание путей и параметров запроса.
 2. **DOM-окружение (`document`):** Поиск скрытого элемента на странице со специфическими атрибутами, генерируемыми сборщиком или Angular.
-3. **Temporal Layer (Скользящее временное окно):** Жесткая привязка к 3-минутным интервалам времени.
+3. **Temporal Layer (Точное время):** Использование текущего Unix timestamp в секундах без временных окон и клиентского буфера границ.
 
 ---
 
@@ -166,83 +168,33 @@ panic = "abort"       # Удаление кода раскрутки стека 
 
 ---
 
-### 5. Алгоритм временных окон и пограничной буферизации (Time-Windowing)
+### 5. Точный Unix timestamp
 
-Для исключения сбоев из-за микро-рассинхронизации часов пользователей и обеспечения высокой динамики токенов применяется алгоритм **3-минутных окон с Just-In-Time генерацией**.
+Вместо временных окон используется текущее время с точностью до секунды. Это ограничивает срок повторного использования результата, но не делает его nonce и не гарантирует уникальность запросов внутри одной секунды.
 
 #### 5.1. Жизненный цикл на клиенте (Angular)
 
-1. Токен **не генерируется** при фоновой загрузке страницы.
-2. Wasm-модуль вызывается **строго в момент сабмита формы** (нажатия кнопки отправки).
-3. **Клиентский буфер границ (Boundary Buffer):**
-* Размер окна: $180$ секунд (3 минуты).
-* Перед вызовом Wasm скрипт проверяет остаток времени до конца текущего интервала:
-
-$$\text{seconds\_left} = \text{current\_window\_end} - \text{now}$$
-
-
-* Если до конца окна осталось **меньше 15 секунд**, клиент принудительно переключает расчет на **следующее 3-минутное окно** ($\text{target\_window} = \text{current\_window\_end}$). Это полностью предотвращает ситуацию, когда запрос отправляется перед сменой окна, а обрабатывается сервером уже в следующем интервале.
-
-
+1. Заголовки вычисляются заново для каждого запроса `HttpClient` через `marketingTelemetryInterceptor`.
+2. Wasm получает `Date.now()` и использует `timestamp = floor(Date.now() / 1000)`.
+3. Временные окна и клиентский boundary buffer не применяются.
+4. `pulse` в `X-GA-Session-Id` является обратимым кодированием timestamp, а не открытым значением времени.
 
 ```typescript
-// Пример расчета окна с буфером на Angular
-function getClientWindowTimestamp(): string {
-  const interval = 180;
-  const now = Math.floor(Date.now() / 1000);
-  const currentWindowStart = Math.floor(now / interval) * interval;
-  const currentWindowEnd = currentWindowStart + interval;
- 
-  if ((currentWindowEnd - now) < 15) {
-    return currentWindowEnd.toString(); // Сдвиг на следующее окно на границе
-  }
-  return currentWindowStart.toString();
-}
-
+const timestamp = Math.floor(Date.now() / 1000);
 ```
 
 #### 5.2. Валидация на бэкенде (PHP 8.4)
 
-Бэкенд выполняет строгую проверку без обращения к базам данных или кэшу:
+Будущий backend должен декодировать `pulse`, проверить каноничность повторным кодированием и сравнить timestamp с серверным временем. Рекомендуемые начальные допуски: не старше 30 секунд и не более 5 секунд в будущем. Затем PHP пересчитывает результат по `contracts/conversion-v1.md`.
 
-1. **Проверка временного окна:** Сервер принимает `X-Client-Timestamp` и сверяет его: окно должно соответствовать текущему серверному окну, либо следующему (учет пограничного буфера клиента), либо предыдущему (допуск на отставание часов до 3 минут).
-2. **Пересчет и верификация подписи:** PHP реконструирует мастер-строку на основе `REQUEST_URI`, актуальных параметров сборки (`build_salt`, `node_id`) и полученного клиентского таймстампа, после чего считает HMAC через секрет из `.env` и сверяет через `hash_equals()`.
-
-```php
-<?php
-declare(strict_types=1);
-
-class SecurityValidator
-{
-    private const int INTERVAL = 180; // 3 минуты
-
-    public static function validateRequest(string $clientSig, int $clientTime): bool
-    {
-        $serverTime = time();
-        $currWindow = (int)(floor($serverTime / self::INTERVAL) * self::INTERVAL);
-        $nextWindow = $currWindow + self::INTERVAL;
-        $prevWindow = $currWindow - self::INTERVAL;
-
-        // 1. Валидация окна (текущее, следующее с учетом буфера или предыдущее с допуском)
-        if (!in_array($clientTime, [$currWindow, $nextWindow, $prevWindow], true)) {
-            return false;
-        }
-
-        // 2. Зеркальная сборка пейлорда
-        $pathname = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '';
-        $buildSalt = 'актуальная_соль_сборки';
-        $nodeId = 'идентификатор_ноды';
-       
-        $masterPayload = "{$pathname}:{$buildSalt}:{$nodeId}:{$clientTime}";
-       
-        // 3. Сверка HMAC
-        $expectedSig = hash_hmac('sha256', $masterPayload, $_ENV['WASM_SECRET_KEY']);
-       
-        return hash_equals($expectedSig, $clientSig);
-    }
-}
-
+```pseudo
+[timestamp, parts] = PulseCodec.parseAndCheck(pulseHeader, serverTime)
+require timestamp >= serverTime - 30
+require timestamp <= serverTime + 5
+require ConversionV1.matches(pathname, pulseHeader, score, properties, serverTime)
 ```
+
+Подробный алгоритм находится в `docs/php-mirror-pseudocode.md`; реализация PHP пока отсутствует.
 
 ---
 
@@ -250,7 +202,7 @@ class SecurityValidator
 
 * **Экономическая невыгода для ботов:** Атакующим для обхода защиты придется эмулировать полноценный браузерный стек с поддержкой DOM-дерева и движка Wasm, что полностью ломает легкие скрипты на Python/Go.
 * **Стойкость к реверс-инжинирингу:** Бинарный `.wasm` файл с флагами сжатия `opt-level = "z"`, сквозной оптимизацией `lto = true` и зачисткой символов `strip = true` превращен в защищенный ассемблерный черный ящик.
-* **Полная безгосударственность (Stateless):** Отсутствие необходимости хранить состояния (nonce) в Redis или сессиях благодаря математической привязке к временным окнам.
+* **Полная безгосударственность (Stateless):** Отсутствие необходимости хранить состояния (nonce) в Redis или сессиях благодаря использованию timestamp и серверной проверки его возраста.
 * **Отсутствие влияния на UX:** Никаких капч для реальных пользователей, мгновенная генерация подписи «на лету» (менее 3 мс) за счет нативной производительности WebAssembly.
 
 ---------
@@ -271,7 +223,7 @@ class SecurityValidator
 
 Камуфляж трафика: Использование стандартных имен заголовков известных систем аналитики (Google Analytics, Amplitude, W3C Trace Context) для маскировки защитных токенов под фоновый шум телеметрии.
 
-Бэкенд: PHP 8.4 (без хранения состояний в Redis, за счет детерминированных временных окон).
+Бэкенд: PHP 8.4 (без хранения состояний в Redis, за счет детерминированного timestamp и серверной проверки его возраста).
 
 3. Структура входных данных и маскировка заголовков
 Для формирования уникального токена скрытый Wasm-модуль агрегирует данные из трех независимых контуров:
@@ -280,12 +232,12 @@ class SecurityValidator
 
 DOM-окружение (document): Поиск скрытого элемента на странице со специфическими атрибутами, генерируемыми при сборке.
 
-Temporal Layer (Скользящее временное окно): Жесткая привязка к 3-минутным интервалам времени.
+Temporal Layer (Точное время): Текущий Unix timestamp в секундах без временных окон и клиентского буфера границ.
 
 Маскировка в сетевых заголовках (Header Camouflage)
 Чтобы запутать ИИ-анализаторов и ботоводов, заголовки запросов оформляются под видом стандартных метрик и систем трассировки:
 
-X-GA-Session-Id — передает текущее 3-минутное временное окно (Timestamp).
+X-GA-Session-Id — передает `pulse`, обратимое кодирование текущего Unix timestamp в секундах.
 
 X-Amplitude-Device-Id — содержит настоящий криптографический Wasm-хэш подписи.
 
@@ -303,41 +255,21 @@ wasm_loader.ts — асинхронный инициализатор бинар�
 
 pixel.wasm — скомпилированный бинарный модуль Rust.
 
-Пример реализации фасада в пакете (index.ts):
+Пример подключения пакета в Angular:
 
-TypeScript
-import initWasm, { calculate_funnel_score } from './pkg/pixel_wasm_bg';
+```typescript
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { marketingTelemetryInterceptor } from '@company/marketing-telemetry';
 
-export class TelemetrySdk {
-  private static isReady = false;
+providers: [
+  provideHttpClient(withInterceptors([
+    apiUrlInterceptor,
+    marketingTelemetryInterceptor,
+  ])),
+]
+```
 
-  public static async getConversionHeaders(actionPath: string): Promise<Record<string, string>> {
-    if (!this.isReady) {
-      await initWasm();
-      this.isReady = true;
-    }
-
-    const interval = 180; // 3 минуты
-    const now = Math.floor(Date.now() / 1000);
-    const currentWindowStart = Math.floor(now / interval) * interval;
-    const currentWindowEnd = currentWindowStart + interval;
-    
-    // Пограничный буфер (сдвиг при приближении к концу окна)
-    const targetWindow = (currentWindowEnd - now) < 15 ? currentWindowEnd : currentWindowStart;
-
-    // Контекст для Wasm
-    const telemetryContext = `${window.location.origin}${actionPath}`;
-    
-    // Генерация подписи внутри Wasm-модуля
-    const signature = calculate_funnel_score(telemetryContext, targetWindow.toString());
-
-    return {
-      'X-GA-Session-Id': targetWindow.toString(),
-      'X-Amplitude-Device-Id': signature, // Реальный Wasm-хэш
-      'X-YM-Counter-Client': 'v2.10.4-pixel' // Фейковый декой для отвода глаз
-    };
-  }
-}
+Interceptor передаёт в Wasm только pathname окончательного HTTP-запроса, получает свежие заголовки для каждого запроса и не требует ручного расчёта времени в Angular. Telemetry-interceptor регистрируется последним, после преобразований API URL.
 
 4.2. Wasm-модуль на Rust (Защита секретов и компиляция)
 Динамическая сборка секретов: Запрещено хранить секретные ключи в виде открытых строк (&str). Ключ собирается в оперативной памяти «на лету» из смещенных массивов байт через побитовые операции (XOR / Bit-shift).
@@ -354,53 +286,24 @@ strip = true          # Полное удаление таблиц символ�
 panic = "abort"       # Удаление кода раскрутки стека
 
 
-5. Алгоритм временных окон и пограничной буферизации (Time-Windowing)
-Just-In-Time генерация: Токен не рассчитывается при загрузке страницы, а генерируется строго в момент сабмита формы через вызов метода NPM-пакета.
-
-Клиентский буфер границ: Если до конца текущего 3-минутного интервала ($180$ секунд) остается менее 15 секунд, клиент автоматически переключает таймстамп на следующее окно, исключая рассинхрон при доставке сетевого пакета.
+5. Точный Unix timestamp
+Just-In-Time генерация: заголовки вычисляются заново для каждого запроса `HttpClient`. Wasm использует `floor(Date.now() / 1000)`; временные окна и клиентский буфер границ отсутствуют. Одинаковые входы в одну секунду дают одинаковый результат, поэтому timestamp не является nonce.
 
 6. Валидация на бэкенде (PHP 8.4)
-Бэкенд принимает «маскированные» под аналитику заголовки, валидирует скользящее окно и пересчитывает HMAC без использования базы данных или Redis:
+Будущий бэкенд принимает «маскированные» под аналитику заголовки, декодирует `pulse` из `X-GA-Session-Id`, проверяет каноничность и возраст timestamp, а затем пересчитывает `cv1` без использования базы данных или Redis. Рекомендуемые начальные допуски — 30 секунд в прошлое и 5 секунд в будущее.
 
-PHP
-<?php
-declare(strict_types=1);
+```pseudo
+[timestamp, parts] = PulseCodec.parseAndCheck(pulseHeader, serverTime)
+require timestamp >= serverTime - 30
+require timestamp <= serverTime + 5
+require ConversionV1.matches(pathname, pulseHeader, score, properties, serverTime)
+```
 
-class SecurityValidator 
-{
-    private const int INTERVAL = 180; // 3 минуты
-
-    public static function validateRequest(string $clientSig, int $clientTime): bool
-    {
-        $serverTime = time();
-        $currWindow = (int)(floor($serverTime / self::INTERVAL) * self::INTERVAL);
-        $nextWindow = $currWindow + self::INTERVAL;
-        $prevWindow = $currWindow - self::INTERVAL;
-
-        // 1. Проверка временного окна (с учетом пограничного буфера и отставания)
-        if (!in_array($clientTime, [$currWindow, $nextWindow, $prevWindow], true)) {
-            return false;
-        }
-
-        // 2. Зеркальная сборка пейлорда
-        $pathname = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '';
-        $buildSalt = 'актуальная_соль_сборки'; 
-        $nodeId = 'идентификатор_ноды';
-        
-        $masterPayload = "{$pathname}:{$buildSalt}:{$nodeId}:{$clientTime}";
-        
-        // 3. Верификация HMAC через безопасное сравнение
-        $expectedSig = hash_hmac('sha256', $masterPayload, $_ENV['WASM_SECRET_KEY']);
-        
-        return hash_equals($expectedSig, $clientSig);
-    }
-}
-
-(При вызове метода контроллера бэкенд считывает X-GA-Session-Id как $clientTime и X-Amplitude-Device-Id как $clientSig, игнорируя декоративные шумовые заголовки).
+Нормативный алгоритм находится в `contracts/conversion-v1.md`; PHP implementation пока отсутствует.
 
 7. Итоговые преимущества архитектуры
 Максимальная маскировка (Camouflage): Критическая логика безопасности полностью скрыта внутри приватного NPM-пакета под видом маркетинговой телеметрии и продуктовой аналитики. Аналитики и боты воспринимают эти запросы как фоновый мусор.
 
 Абсолютная изоляция: Код фронтенда в Angular не загрязнен сложными криптографическими вызовами — разработчики используют чистый абстрактный интерфейс.
 
-Экономичность и производительность: Stateless-архитектура на временных окнах и нативная скорость Wasm (менее 3 мс) обеспечивают защиту без капч, сессий в Redis и падения UX.
+Экономичность и производительность: Stateless-архитектура с точным timestamp и нативная скорость Wasm обеспечивают проверку без капч и сессий в Redis.

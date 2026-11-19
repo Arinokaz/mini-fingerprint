@@ -14,7 +14,7 @@ export type ConversionProperty = [name: string, value: string];
 export interface ConversionPayload {
   /** Версия conversion-контракта; текущая реализация использует `cv1`. */
   profile: string;
-  /** Обратимое представление выбранного временного окна. */
+  /** Обратимое представление точного Unix timestamp в секундах. */
   pulse: string;
   /** Итоговые 64 hex-символа, передаваемые в заголовке без изменений. */
   score: string;

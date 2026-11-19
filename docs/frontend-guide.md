@@ -34,20 +34,21 @@ hash-security/
 │       ├── package.json                  # ng build, ng serve и frontend unit tests
 │       ├── proxy.conf.json               # Будущий /api proxy на PHP
 │       ├── src/
-│       │   ├── main.ts                   # bootstrapApplication
+│       │   ├── main.ts                   # Bootstrap, HttpClient и telemetry interceptor
 │       │   ├── index.html
 │       │   ├── app/
-│       │   │   ├── app.ts                # Компонент страницы и TelemetrySdk
+│       │   │   ├── app.ts                # Компонент страницы и HttpClient
 │       │   │   ├── app.html              # Inputs, кнопки и DOM-якорь
 │       │   │   ├── app.css
-│       │   │   └── conversion-demo.service.ts
+│       │   │   └── conversion-demo.service.ts # HTTP-запросы без ручной telemetry
 │       │   └── environments/             # data-tag для каждой конфигурации
 │       └── tests/                        # Тесты сервиса отправки
 │
 ├── packages/
 │   └── marketing-telemetry/              # Локальный NPM workspace
 │       ├── src/
-│       │   ├── index.ts                  # Публичный экспорт TelemetrySdk
+│       │   ├── index.ts                  # Публичные TelemetrySdk и interceptor
+│       │   ├── angular-interceptor.ts    # Pathname, fail-open и headers HttpClient
 │       │   ├── conversion.ts             # Заголовки и разбор ответа Wasm
 │       │   ├── runtime.ts                # Base64 decode и lazy initialization
 │       │   ├── settings.ts               # Имена заголовков
@@ -64,7 +65,7 @@ hash-security/
 │       │   ├── lib.rs                    # calculate_funnel_score и Date::now()
 │       │   ├── journey.rs                # API-путь и контекст вычисления
 │       │   ├── touchpoint.rs             # DOM и fallback
-│       │   ├── pulse.rs                  # Окна и обратимое время
+│       │   ├── pulse.rs                  # Обратимый Unix timestamp
 │       │   ├── frame.rs                  # Восемь u32 и hex-сериализация
 │       │   ├── stages.rs                 # Реальные стадии и дополнительные ветки
 │       │   ├── codec.rs                  # Канонические свойства

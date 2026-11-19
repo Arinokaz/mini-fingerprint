@@ -96,8 +96,15 @@
 - [x] `npm test` — полный набор workspace/contract tests.
 - [x] `cargo test --manifest-path crates/funnel-wasm/Cargo.toml` — Rust unit/golden tests.
 - [x] `npm run build` — WASM, npm package и Angular production build с нуля.
+- [x] Удалены устаревшие window-формулировки из `readme.md`, `settings.ts`, `types.ts`; исправлено `window.location.pathname` в контракте.
 - [ ] У frontend-команды подтвердить версии Angular/RxJS, способ формирования API URL и порядок существующих interceptor’ов; telemetry должен регистрироваться последним после URL rewrites.
-- [ ] `npm run build:npm` и `npm run test:release --workspace @company/marketing-telemetry` — оба архива.
-- [ ] `npm run test:package:angular` — установка архивов, production builds и browser checks.
-- [ ] `npm run test:browser` — реальный WASM, DOM variants, golden headers и network behavior.
-- [ ] При любом сбое исправить реализацию и повторить полный регресс; не считать работу окончательно проверенной до зелёного результата.
+- [x] `npm run build:npm` и `npm run test:release --workspace @company/marketing-telemetry` — оба архива.
+- [x] `npm run test:package:angular` — установка архивов, production builds и browser checks.
+- [x] `npm run test:browser` — реальный WASM, DOM variants, golden headers и network behavior.
+- [x] При любом сбое исправить реализацию и повторить полный регресс; не считать работу окончательно проверенной до зелёного результата. Сбоев не обнаружено; полный регресс зелёный.
+
+## Повторное независимое ревью 2026-11-19
+
+- [x] Important: при generation failure удалять все пять pre-existing telemetry-заголовков, сохраняя unrelated headers; добавлен RED→GREEN regression и повторён полный регресс.
+- [x] Minor: обновлены старые temporal/component-описания в uppercase `README.md` и `docs/frontend-guide.md`.
+- [x] Minor: добавлен отдельный test для синхронного throw из SDK; mutation check подтвердил RED при удалении `Promise.resolve().then(...)` и GREEN после восстановления.

@@ -4,7 +4,7 @@ export const COUNTER_CLIENT = 'v2.10.4-pixel';
 /** Заголовок с версией активного conversion-контракта. */
 export const MEASUREMENT_HEADER = 'X-GA-Measurement-Id';
 
-/** Заголовок с обратимым представлением выбранного временного окна. */
+/** Заголовок с обратимым представлением точного Unix timestamp в секундах. */
 export const SESSION_HEADER = 'X-GA-Session-Id';
 
 /** Заголовок с итоговым 64-символьным hex-результатом вычислений. */

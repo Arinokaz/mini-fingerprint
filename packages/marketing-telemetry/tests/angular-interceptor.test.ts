@@ -2,7 +2,7 @@ import '@angular/compiler';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DOCUMENT } from '@angular/common';
-import { HttpErrorResponse, HttpHandlerFn, HttpRequest, HttpResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpHandlerFn, HttpHeaders, HttpRequest, HttpResponse } from '@angular/common/http';
 import { Injector, runInInjectionContext } from '@angular/core';
 import { firstValueFrom, Observable, of, throwError } from 'rxjs';
 import {
@@ -115,6 +115,52 @@ test('generation failure forwards the original request without partial headers',
   assert.equal(response.body, 'sent');
   assert.strictEqual(outgoing, request);
   assert.equal(outgoing?.headers.has('X-Amplitude-Device-Id'), false);
+});
+
+test('synchronous generation throw forwards the original request once without telemetry', async () => {
+  const request = new HttpRequest<unknown>('POST', '/api/auth/login', { email: 'a@b.test' });
+  const sdk = sdkWith(() => { throw new Error('synchronous pixel failure'); });
+  let outgoing: HttpRequest<unknown> | undefined;
+  let submissions = 0;
+
+  const response = await firstValueFrom(intercept(request, sdk, (forwarded) => {
+    submissions += 1;
+    outgoing = forwarded;
+    return of(new HttpResponse({ status: 200, body: 'sent' }));
+  }));
+
+  assert.equal(response.body, 'sent');
+  assert.equal(submissions, 1);
+  assert.strictEqual(outgoing, request);
+  for (const name of Object.keys(conversionHeaders)) {
+    assert.equal(outgoing?.headers.has(name), false, `${name} must be absent`);
+  }
+});
+
+test('generation failure strips stale telemetry headers and preserves unrelated headers', async () => {
+  const request = new HttpRequest<unknown>('POST', '/api/auth/login', { email: 'a@b.test' }, {
+    headers: new HttpHeaders({
+      ...conversionHeaders,
+      'X-Request-Trace': 'keep-me',
+    }),
+  });
+  const sdk = sdkWith(async () => { throw new Error('pixel unavailable'); });
+  let outgoing: HttpRequest<unknown> | undefined;
+  let submissions = 0;
+
+  await firstValueFrom(intercept(request, sdk, (forwarded) => {
+    submissions += 1;
+    outgoing = forwarded;
+    return of(new HttpResponse({ status: 200 }));
+  }));
+
+  assert.equal(submissions, 1);
+  for (const name of Object.keys(conversionHeaders)) {
+    assert.equal(outgoing?.headers.has(name), false, `${name} must be removed`);
+  }
+  assert.equal(outgoing?.headers.get('X-Request-Trace'), 'keep-me');
+  assert.equal(outgoing?.url, request.url);
+  assert.deepEqual(outgoing?.body, request.body);
 });
 
 test('downstream HTTP failure is not mistaken for generation failure or retried', async () => {

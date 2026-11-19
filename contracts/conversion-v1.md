@@ -73,7 +73,7 @@ substitute(b) = S[b & 0x0f] | (S[(b >> 4) & 0x0f] << 4)
 
 ### 4.1. API-путь (`journey`)
 
-Angular явно передаёт путь, например `/api/auth/login`. Путь обязан быть корректной UTF-8 строкой длиной от 1 до 512 байт, начинаться с `/` и не содержать query string, fragment или NUL. `timestamp.location.pathname` вместо API-пути не используется.
+Angular явно передаёт путь, например `/api/auth/login`. Путь обязан быть корректной UTF-8 строкой длиной от 1 до 512 байт, начинаться с `/` и не содержать query string, fragment или NUL. `window.location.pathname` вместо API-пути не используется.
 
 ### 4.2. DOM-атрибут (`touchpoint`)
 
