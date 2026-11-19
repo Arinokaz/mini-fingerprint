@@ -10,8 +10,9 @@
 2. [`modules/angular-demo.md`](modules/angular-demo.md) — как демонстрационная страница вызывает пакет.
 3. [`modules/telemetry-package.md`](modules/telemetry-package.md) — классы и методы TypeScript/npm-пакета.
 4. [`modules/rust-wasm.md`](modules/rust-wasm.md) — модули и функции Rust/WASM.
-5. [`../contracts/conversion-v2.md`](../contracts/conversion-v2.md) — активный алгоритм `cv2`, включая наследуемые общие операции `cv1`; при расхождении с кратким описанием контракты являются первичными.
-6. [`deployment.md`](deployment.md) — только когда нужно собрать или выдать пакет фронтендам.
+5. [`modules/product-analytics.md`](modules/product-analytics.md) — независимый TypeScript pa1 и analytics envelope.
+6. [`../contracts/conversion-v2.md`](../contracts/conversion-v2.md) и [`../contracts/product-analytics-v1.md`](../contracts/product-analytics-v1.md) — нормативные алгоритмы двух пакетов; при расхождении контракты являются первичными.
+7. [`deployment.md`](deployment.md) — только когда нужно собрать или выдать пакеты фронтендам.
 
 ## 2. Карта технологий
 
@@ -19,6 +20,7 @@
 |---|---|---|
 | Angular | Страница, форма, компонент и сервис отправки | Шаблон + класс страницы + application service |
 | TypeScript | Публичный API пакета, проверка ответа WASM, формирование заголовков | Статически типизированный PHP-сервис |
+| Product analytics | Независимый pa1, DOM view, graphics и engagement envelope | Отдельный application service с DTO |
 | Rust | Основные вычисления, чтение DOM и времени | Отдельная библиотека с алгоритмом |
 | WebAssembly | Форма, в которой Rust выполняется в браузере | Скомпилированный модуль, вызываемый из JS |
 | npm | Установка TypeScript-пакета в Angular | Composer |

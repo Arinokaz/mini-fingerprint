@@ -11,6 +11,7 @@
 | `RuntimeGate` | Однократная инициализация и разделение concurrent-вызовов | [`modules/telemetry-package.md`](modules/telemetry-package.md) |
 | `pixel-runtime.ts` | Base64 decode и инициализация WebAssembly из bytes | [`modules/telemetry-package.md`](modules/telemetry-package.md) |
 | Rust `funnel-wasm` | Время, DOM, канонизация свойств, clickId и вычисления `cv2` | [`modules/rust-wasm.md`](modules/rust-wasm.md) |
+| TypeScript `product-analytics` | Независимый `pa1`, второй DOM marker, graphics/engagement и analytics snapshot | [`modules/product-analytics.md`](modules/product-analytics.md) |
 | HTTP API | Получает JSON и telemetry-заголовки | Backend mirror пока отложен |
 
 ## 2. Полный путь login/register
@@ -54,6 +55,8 @@ Interceptor клонирует request и один раз передаёт ег�
   • HTTP-ошибка downstream → передаётся приложению без retry
 ```
 
+До показанного Wasm interceptor запускается `productAnalyticsInterceptor`: `ProductAnalytics` читает `canvas.analytics_stage[data-view]`, собирает лёгкий pa1 и analytics snapshot, после чего Wasm добавляет собственный набор. При `PRODUCT_ONLY=1` browser-check отключает WebAssembly: pa1 сохраняется, а cv2 headers отсутствуют.
+
 ## 3. Что возвращает npm-пакет
 
 `TelemetrySdk.getConversionHeaders()` возвращает `Promise<Record<string, string>>` с шестью заголовками:
@@ -68,6 +71,20 @@ Interceptor клонирует request и один раз передаёт ег�
 | `X-YM-Counter-Client` | Статическое telemetry-значение |
 
 Названия централизованы в `packages/marketing-telemetry/src/settings.ts`.
+
+### 3.1. Независимый TypeScript `pa1`
+
+`ProductAnalytics.getEngagementHeaders()` добавляет пять `X-PA-*` заголовков:
+
+| Заголовок | Содержимое |
+|---|---|
+| `X-PA-Measurement-Id` | `pa1` |
+| `X-PA-Session-Id` | Обратимый timestamp, 16 hex |
+| `X-PA-Device-Id` | Независимый 128-битный score, 32 hex |
+| `X-PA-Event-Id` | Event ID текущего запроса, 32 hex |
+| `X-PA-Session-Properties` | Compact analytics JSON в base64url |
+
+Пакет использует `canvas.analytics_stage[data-view]`, а не Wasm span. Полный snapshot отправляется на каждый запрос и не участвует в score. Общий eventId связывает score с analytics properties. Два interceptor работают независимо; ошибка одного не удаляет заголовки другого. Подробности: [`modules/product-analytics.md`](modules/product-analytics.md).
 
 ## 4. Данные, которые получает Rust
 
@@ -153,6 +170,7 @@ JS bundle → base64 decode → WebAssembly.instantiate → вычисления
 - Маскировка убирает очевидные подсказки и увеличивает стоимость анализа, но не доказывает подлинность браузера.
 - Нельзя считать клиентский `score` самостоятельным доказательством безопасности.
 - Независимая серверная реализация должна проверять входные данные, время и результат по тому же контракту.
+- Analytics properties клиента являются наблюдениями, а не доказанными фактами среды; их группировка относится к отложенному Internal Feature Processor.
 - PHP mirror и endpoints сейчас не реализованы; demo browser server намеренно возвращает generic `403`, чтобы проверить сетевые заголовки без backend.
 
 Нормативные детали: [`../contracts/conversion-v1.md`](../contracts/conversion-v1.md). Псевдокод будущей серверной части: [`php-mirror-pseudocode.md`](php-mirror-pseudocode.md).

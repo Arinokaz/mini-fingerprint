@@ -14,6 +14,7 @@ npm run build     # Wasm → base64 → minified embedded NPM dist → Angular p
 npm run build:npm # Дополнительно: embedded + lazy .tgz и size-report.json.
 npm test          # Контракт, TypeScript, оба NPM-варианта и реальный Wasm.
 npm run test:browser
+PRODUCT_ONLY=1 npm run test:browser
 ```
 
 Для повторной сборки после изменения Rust достаточно:
@@ -58,6 +59,19 @@ hash-security/
 │       ├── dist/                         # GENERATED: скомпилированный NPM JS
 │       └── tests/
 │
+│   # Независимый TypeScript product analytics без Wasm
+│   └── product-analytics/
+│       ├── src/page-frame.ts             # Четыре u32 и стадии pa1
+│       ├── src/page-codec.ts             # Время, IDs и byte limits
+│       ├── src/page-conversion.ts        # Независимый pa1 pipeline
+│       ├── src/page-view.ts              # viewId/eventId sequence
+│       ├── src/engagement.ts             # Capped counters/bitmask
+│       ├── src/graphics.ts               # Обобщённая graphics category
+│       ├── src/snapshot.ts               # Compact analytics JSON
+│       ├── src/product-analytics.ts      # Facade и пять headers
+│       ├── src/providers.ts              # Ранний Angular start
+│       └── src/angular-interceptor.ts    # Независимый pa1 interceptor
+│
 ├── crates/
 │   └── funnel-wasm/                      # Rust crate
 │       ├── Cargo.toml                    # Зависимости и release-профиль
@@ -76,7 +90,8 @@ hash-security/
 │
 ├── contracts/
 │   ├── conversion-v1.md                  # Сохранённый исходный алгоритм
-│   └── conversion-v2.md                  # Активный алгоритм с clickId
+│   ├── conversion-v2.md                  # Активный алгоритм с clickId
+│   └── product-analytics-v1.md           # Независимый TypeScript pa1
 ├── tests/
 │   └── fixtures/conversion-v*.json       # Независимые ожидаемые значения
 ├── scripts/
@@ -95,7 +110,7 @@ hash-security/
 - `crates/funnel-wasm/src/**`
 - `packages/marketing-telemetry/src/*.ts`, кроме `generated-pixel.ts`
 - `apps/demo-web/src/**`
-- `contracts/conversion-v1.md` и `contracts/conversion-v2.md`
+- `contracts/conversion-v1.md`, `contracts/conversion-v2.md` и `contracts/product-analytics-v1.md`
 - тесты и fixtures при изменении протокола.
 
 ### Не редактировать вручную
@@ -176,7 +191,8 @@ npm run build:npm
 
 - `embedded` помещает runtime и base64 в `dist/index.js`;
 - `lazy` выносит их в `dist/pixel.<hash>.js`, который загружается при первом API-вызове;
-- `release/size-report.json` показывает raw/base64/JS/gzip-размеры.
+- `release/size-report.json` показывает raw/base64/JS/gzip-размеры;
+- `company-product-analytics-0.1.0.tgz` содержит независимый минифицированный TypeScript `pa1`, а `product-analytics-size-report.json` фиксирует его размер.
 
 Во время выполнения:
 
@@ -224,7 +240,8 @@ apps/demo-web/dist/demo-web/browser/
 ```text
 1. npm run build:wasm
 2. npm run build --workspace @company/marketing-telemetry
-3. npm run build --workspace demo-web
+3. npm run build --workspace @company/product-analytics
+4. npm run build --workspace demo-web
 ```
 
 Так Angular никогда не импортирует устаревший или отсутствующий `dist` локального NPM-пакета.
@@ -274,6 +291,8 @@ npm run test:browser
 
 - production Angular и настоящий embedded Wasm;
 - точные `clickId`, `pulse` и `score` из cv2 golden fixtures;
+- точные pa1 score/eventId/pulse и analytics snapshot из отдельных fixtures;
+- `PRODUCT_ONLY=1` сохраняет pa1 при отключённом WebAssembly;
 - отсутствие сетевого запроса `pixel.wasm`;
 - valid/missing/empty/duplicate DOM;
 - login/register и свойства всех пяти запросов;

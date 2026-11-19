@@ -7,12 +7,18 @@
 ```typescript
 bootstrapApplication(App, {
   providers: [
-    provideHttpClient(withInterceptors([marketingTelemetryInterceptor])),
+    provideProductAnalytics(),
+    provideHttpClient(withInterceptors([
+      productAnalyticsInterceptor,
+      marketingTelemetryInterceptor,
+    ])),
   ],
 });
 ```
 
 Interceptor регистрируется один раз. Все запросы `HttpClient`, включая login/register, проходят через него без endpoint allowlist и специальных свойств формы. Нативный `fetch` в demo не используется.
+
+Дополнительно `provideProductAnalytics()` заранее запускает engagement listeners, а `productAnalyticsInterceptor` добавляет пять `X-PA-*` заголовков до Wasm interceptor. Два набора не зависят друг от друга.
 
 ## 2. Компонент `App` — `src/app/app.ts`
 
@@ -65,17 +71,20 @@ HTTP-ответ с ненулевым status превращается в generic
 
 ```html
 <span class="telemetrics_click" [attr.data-tag]="touchpoint" hidden></span>
+<canvas class="analytics_stage" [attr.data-view]="analyticsView" hidden></canvas>
 ```
 
 Элемент должен существовать в активном DOM ровно в одном экземпляре. Missing/empty/duplicate/oversized marker приводит к `telemetry.unresolved.v1`, а не исключению. Backend должен отклонять fallback для защищаемых операций.
 
+Независимый `canvas.analytics_stage[data-view]` имеет те же правила уникальности, но собственный configured marker и fallback `analytics.unresolved.v1`. Canvas служит источником обобщённой graphics category; graphics не влияет на pa1 score.
+
 ## 6. Environments
 
-| Файл | `touchpoint` |
-|---|---|
-| `environment.ts` | `production-build-tag` |
-| `environment.staging.ts` | `staging-build-tag` |
-| `environment.development.ts` | `dsf3fdfgdfg` |
+| Файл | `touchpoint` | `analyticsView` |
+|---|---|---|
+| `environment.ts` | `production-build-tag` | `production-view-2026.11` |
+| `environment.staging.ts` | `staging-build-tag` | `staging-view-2026.11` |
+| `environment.development.ts` | `dsf3fdfgdfg` | `development-view-2026.11` |
 
 `data-tag` должен совпадать с ожидаемым значением будущей серверной конфигурации. `pixelUrl` отсутствует: WASM встроен в JS.
 
@@ -83,4 +92,4 @@ HTTP-ответ с ненулевым status превращается в generic
 
 Реальный PHP endpoint отсутствует; browser test server возвращает generic `403`. `apps/demo-web/tests/conversion-demo.service.test.ts` проверяет `HttpClient`-запросы, generic HTTP results и network failures. `packages/marketing-telemetry/tests/angular-interceptor.test.ts` проверяет headers, pathname, fail-open и отсутствие downstream retry.
 
-`scripts/check-browser.mjs` дополнительно проверяет production Angular с реальным WASM, empty canonical properties, golden login/register, DOM variants, отсутствие `.wasm`-запросов и embedded/lazy network behavior. Полный browser regression выполняется отдельно после быстрых unit/build проверок.
+`scripts/check-browser.mjs` дополнительно проверяет production Angular с реальным WASM, empty canonical properties, golden login/register, DOM variants, отсутствие `.wasm`-запросов и embedded/lazy network behavior. Полный browser regression выполняется отдельно после быстрых unit/build проверок. `PRODUCT_ONLY=1 npm run test:browser` отключает WebAssembly и подтверждает, что pa1 остаётся валидным, а cv2 headers отсутствуют.

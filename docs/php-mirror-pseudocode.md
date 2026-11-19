@@ -238,3 +238,21 @@ HTTP-слой позднее будет только читать заголов
 6. Некорректные hex, JSON, base64url, дубли и превышение лимитов дают `false` без warnings.
 7. Timestamp ровно на границах past=30/future=5 принимается; более старый и более далёкий будущий отклоняются.
 8. Differential-тест на одинаковых случайных входах сравнивает Rust и PHP после каждой стадии.
+
+## 8. Будущий `pa1` mirror
+
+TypeScript product analytics требует собственной проверки и не должен использовать классы `cv2` как готовый alias. Нормативный источник — `contracts/product-analytics-v1.md` и его fixtures.
+
+Предлагаемые независимые компоненты:
+
+```text
+PageUInt32          Четыре lanes, add/sub/mul/rotate без float.
+PagePulseCodec      Обратимое время pa1.
+PageIdentifier      Строгие 32 hex ↔ 16 bytes для viewId/eventId.
+PageFrameReducer    Стадии page/view/event/time.
+ProductCheckpoint   Формат пяти headers, TTL и score.
+```
+
+`ProductCheckpoint` использует фактический route и server-configured `data-view`, повторяет `pa1`, проверяет размер analytics snapshot и возвращает generic 403 для любой ошибки. Graphics/engagement не входят в score.
+
+После синхронной проверки backend может передать envelope во внутренний сервис обработки признаков. Эта передача и сама аналитика отложены и не блокируют текущий запрос.

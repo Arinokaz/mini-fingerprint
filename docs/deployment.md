@@ -260,9 +260,11 @@ Angular может переименовать `pixel.<hash>.js` в собств�
 
 Base64 увеличивает бинарные данные примерно на треть. Сравнивайте фактические значения из отчёта после каждого изменения алгоритма.
 
-Baseline текущей `cv2`-сборки: raw Wasm 87 173 байта, base64 116 232 байта; embedded `index.js` — 124 656 байт / 57 056 gzip, lazy facade — 2 472 байта / 1 235 gzip, lazy runtime — 121 859 байт / 55 527 gzip. Это размеры конкретной сборки, а не лимиты.
+Baseline текущей `cv2`-сборки: raw Wasm 87 267 байт, base64 116 356 байт; embedded `index.js` — 124 780 байт / 57 295 gzip, lazy facade — 2 472 байта / 1 235 gzip, lazy runtime — 121 983 байта / 55 771 gzip. Это размеры конкретной сборки, а не лимиты.
 
 Release-проверка реального Wasm на Node.js 18 для default `"00"` зафиксировала за 201 вызов: median 0,204 ms и p95 0,819 ms. Это наблюдение на текущей машине, а не обещание для браузеров и слабых устройств. Не повышайте prefix без отдельного измерения median/p95 на целевых клиентах.
+
+Независимый product analytics `.tgz` — 5 850 bytes, а `dist/index.js` — 8 970 bytes / 3 931 gzip. Representative snapshot — 206 raw bytes и 275 base64url chars; protocol budget — 1024 raw bytes, 1400 base64url chars и не более 2 KB для всех пят pa1 headers.
 
 ### 5.3. Проверка содержимого и поведения
 
@@ -308,6 +310,14 @@ npm install /path/to/mini-fingerprint/release/company-marketing-telemetry-0.1.0-
 npm install /path/to/mini-fingerprint/release/company-marketing-telemetry-0.1.0-lazy.tgz
 ```
 
+В обоих случаях отдельно установите обязательный независимый TypeScript-пакет:
+
+```bash
+npm install /path/to/mini-fingerprint/release/company-product-analytics-0.1.0.tgz
+```
+
+Wasm-вариант выбирается по bundle-стратегии; product analytics не заменяет его и не копирует его алгоритм.
+
 npm добавит пакет в `dependencies` и обновит `package-lock.json`. Импорт и вызовы `TelemetrySdk` одинаковые в обоих случаях.
 
 Для команды и CI удобнее передавать архив как артефакт и использовать относительный путь, например:
@@ -317,13 +327,15 @@ angular-app/
 ├── package.json
 ├── package-lock.json
 └── vendor/
-    └── company-marketing-telemetry-0.1.0-embedded.tgz
+    ├── company-marketing-telemetry-0.1.0-embedded.tgz
+    └── company-product-analytics-0.1.0.tgz
 ```
 
 Тогда из корня Angular-приложения:
 
 ```bash
 npm install ./vendor/company-marketing-telemetry-0.1.0-embedded.tgz
+npm install ./vendor/company-product-analytics-0.1.0.tgz
 ```
 
 В `package.json` появится зависимость вида:
@@ -380,12 +392,23 @@ npm ls @company/marketing-telemetry
 ></span>
 ```
 
-Пример свойства компонента:
+Добавьте рядом ровно один независимый TypeScript marker:
+
+```html
+<canvas
+  class="analytics_stage"
+  [attr.data-view]="analyticsView"
+  hidden
+></canvas>
+```
+
+`analyticsView` берётся из отдельного environment-поля и не должен совпадать по смыслу с Wasm `touchpoint`. Canvas также предоставляет необязательный graphics context; отсутствие WebGL не мешает pa1.
 
 ```typescript
 import { environment } from '../environments/environment';
 
 protected readonly touchpoint = environment.touchpoint;
+protected readonly analyticsView = environment.analyticsView;
 ```
 
 `data-tag` должен быть непустым и совпадать со значением, которого ожидает серверная проверка текущей сборки. Элемент должен существовать в активном DOM **до вызова** `getConversionHeaders()`. Не размещайте несколько элементов `.telemetrics_click` одновременно: duplicate/missing/empty обрабатываются fallback-логикой, но такие состояния не должны быть нормальной интеграцией.
@@ -397,9 +420,14 @@ protected readonly touchpoint = environment.touchpoint;
 ```typescript
 import { provideHttpClient, withInterceptors } from "@angular/common/http";
 import { marketingTelemetryInterceptor } from "@company/marketing-telemetry";
+import { productAnalyticsInterceptor, provideProductAnalytics } from "@company/product-analytics";
 
 providers: [
-  provideHttpClient(withInterceptors([marketingTelemetryInterceptor])),
+  provideProductAnalytics(),
+  provideHttpClient(withInterceptors([
+    productAnalyticsInterceptor,
+    marketingTelemetryInterceptor,
+  ])),
 ]
 ```
 
@@ -410,6 +438,7 @@ providers: [
 ```typescript
 provideHttpClient(withInterceptors([
   apiUrlInterceptor,
+  productAnalyticsInterceptor,
   marketingTelemetryInterceptor,
 ]))
 ```
@@ -421,6 +450,8 @@ return this.http.post("/api/auth/login", { email, password });
 ```
 
 Interceptor обрабатывает все `HttpClient`-запросы, передаёт в WASM pathname и настроенный `scorePrefix` и вызывает `getConversionHeaders(path, {})` заново для каждого запроса. Шесть заголовков добавляются целиком. Специальные `form=login/register` больше не используются.
+
+`productAnalyticsInterceptor` независимо добавляет пять `X-PA-*` заголовков, а `provideProductAnalytics()` запускает engagement listeners до первого API-запроса. При ошибке одного пакета удаляются только его собственные headers; другой набор сохраняется.
 
 `@angular/common`, `@angular/core` и `rxjs` объявлены как `peerDependencies`: пакет использует копии этих библиотек из приложения и не встраивает второй Angular в bundle. Текущий manifest требует Angular `>=16 <17` и RxJS `^7.8.0`; production, browser и isolated `.tgz` сборки проверены на Angular 16.2 / TypeScript 5.1.
 
@@ -460,6 +491,11 @@ X-Amplitude-Device-Id
 X-Amplitude-Event-Id
 X-Amplitude-Session-Properties
 X-YM-Counter-Client
+X-PA-Measurement-Id
+X-PA-Session-Id
+X-PA-Device-Id
+X-PA-Event-Id
+X-PA-Session-Properties
 ```
 
 Также настройте допустимый origin, метод и credentials согласно архитектуре вашего приложения. Для same-origin `/api/...` отдельная CORS-настройка не нужна.
