@@ -56,7 +56,7 @@ const options = {
   bundle: true,
   format: 'esm',
   platform: 'browser',
-  target: 'es2022',
+  target: 'es2020',
   minify: true,
   legalComments: 'none',
   sourcemap: false,

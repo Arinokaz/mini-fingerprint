@@ -10,7 +10,7 @@ import { ApiJourney, ConversionDemoService } from './conversion-demo.service';
 @Component({
   selector: 'app-root',
   templateUrl: './app.html',
-  styleUrl: './app.css',
+  styleUrls: ['./app.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class App {

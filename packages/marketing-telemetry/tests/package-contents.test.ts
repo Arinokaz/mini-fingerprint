@@ -31,7 +31,9 @@ test('NPM tarball contains only the minified embedded runtime and declarations',
   assertNeutralArtifact(declarations, 'dist/index.d.ts');
 });
 
-test('package peer contract requires RxJS with top-level pipeable operators', () => {
+test('package peer contract matches the Angular 16 consumer and RxJS operators', () => {
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(manifest.peerDependencies['@angular/common'], '>=16 <17');
+  assert.equal(manifest.peerDependencies['@angular/core'], '>=16 <17');
   assert.equal(manifest.peerDependencies.rxjs, '^7.8.0');
 });

@@ -8,6 +8,7 @@ import { dirname, extname, isAbsolute, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
+import { WebSocket } from 'undici';
 
  /** Repository root and production output under test. */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');

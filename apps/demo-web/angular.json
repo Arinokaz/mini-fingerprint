@@ -10,11 +10,12 @@
       "prefix": "app",
       "architect": {
         "build": {
-          "builder": "@angular/build:application",
+          "builder": "@angular-devkit/build-angular:browser",
           "options": {
-            "browser": "src/main.ts",
+            "outputPath": "dist/demo-web/browser",
+            "main": "src/main.ts",
             "index": "src/index.html",
-            "polyfills": [],
+            "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
             "assets": [],
             "styles": ["src/styles.css"]
@@ -51,11 +52,11 @@
           "defaultConfiguration": "production"
         },
         "serve": {
-          "builder": "@angular/build:dev-server",
+          "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
-            "production": { "buildTarget": "demo-web:build:production" },
-            "staging": { "buildTarget": "demo-web:build:staging" },
-            "development": { "buildTarget": "demo-web:build:development" }
+            "production": { "browserTarget": "demo-web:build:production" },
+            "staging": { "browserTarget": "demo-web:build:staging" },
+            "development": { "browserTarget": "demo-web:build:development" }
           },
           "defaultConfiguration": "development"
         }

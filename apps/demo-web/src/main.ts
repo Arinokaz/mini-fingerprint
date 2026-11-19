@@ -1,13 +1,11 @@
-import { provideZonelessChangeDetection } from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { marketingTelemetryInterceptor } from '@company/marketing-telemetry';
 import { App } from './app/app';
 
-/** Запускает standalone demo без глобальной Zone.js-зависимости. */
+/** Запускает standalone demo на стабильной Zone.js-модели Angular 16. */
 bootstrapApplication(App, {
   providers: [
-    provideZonelessChangeDetection(),
     provideHttpClient(withInterceptors([marketingTelemetryInterceptor])),
   ],
 }).catch((error: unknown) => {
