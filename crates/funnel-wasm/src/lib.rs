@@ -22,7 +22,7 @@ pub fn calculate_funnel_score(
     properties_json: &str,
     score_prefix: &str,
 ) -> Result<String, wasm_bindgen::JsValue> {
-    use crate::click::next_browser_click_id;
+    use crate::click::{next_browser_click_id, validate_score_prefix};
     use crate::codec::CanonicalProperties;
     use crate::journey::JourneyContext;
     use crate::pulse::pulse_to_hex;
@@ -31,6 +31,8 @@ pub fn calculate_funnel_score(
     use serde_json::{json, Value};
     use wasm_bindgen::JsValue;
 
+    validate_score_prefix(score_prefix)
+        .map_err(|_| JsValue::from_str("unsupported conversion settings"))?;
     let properties = CanonicalProperties::parse(properties_json)
         .map_err(|_| JsValue::from_str("unsupported conversion properties"))?;
     let canonical_json = properties.canonical_json();

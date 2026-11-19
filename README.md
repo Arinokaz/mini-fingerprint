@@ -21,7 +21,7 @@
 
 ## Требования
 
-- Node.js `^18.10.0` и npm; demo и package-проверки используют Angular 16.2 и TypeScript 5.1.
+- Node.js `^18.17.0` и npm; demo и package-проверки используют Angular 16.2 и TypeScript 5.1.
 - Rust stable через `rustup`, target `wasm32-unknown-unknown`.
 - `wasm-pack` для последующих этапов.
 - PHP 8.4+ и Composer понадобятся только для отложенного серверного этапа.

@@ -32,7 +32,7 @@
 
 Для сборки этого репозитория требуются:
 
-- Node.js `^18.10.0` и npm;
+- Node.js `^18.17.0` и npm;
 - Rust stable, установленный через `rustup`;
 - компиляционный target `wasm32-unknown-unknown`;
 - `wasm-pack`, доступный в `PATH`.

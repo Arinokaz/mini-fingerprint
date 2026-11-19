@@ -3,6 +3,13 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { TelemetrySdk } from '../src/conversion.js';
 
+async function loadGeneratedPixel() {
+  const wasmBytes = await readFile(new URL('../pkg/pixel.wasm', import.meta.url));
+  const generated = await import('../pkg/funnel_wasm.js');
+  await generated.default({ module_or_path: new Uint8Array(wasmBytes) });
+  return { calculate_funnel_score: generated.calculate_funnel_score };
+}
+
 test('real Wasm produces deterministic cv2 headers from the browser sequence', async () => {
   const fixture = JSON.parse(await readFile(
     new URL('../../../tests/fixtures/conversion-v2.json', import.meta.url),
@@ -46,6 +53,50 @@ test('real Wasm produces deterministic cv2 headers from the browser sequence', a
     Date.now = originalNow;
     Math.random = originalRandom;
     globalThis.fetch = originalFetch;
+    Object.defineProperty(globalThis.performance, 'now', {
+      configurable: true,
+      value: originalPerformanceNow,
+    });
+  }
+});
+
+test('real Wasm rejects an invalid prefix before reading browser sources', async () => {
+  const raw = await loadGeneratedPixel();
+  const originalNow = Date.now;
+  const originalRandom = Math.random;
+  const originalPerformanceNow = globalThis.performance.now;
+  let clockCalls = 0;
+  let randomCalls = 0;
+  let performanceCalls = 0;
+  try {
+    Date.now = () => {
+      clockCalls += 1;
+      return 1699999920000;
+    };
+    Math.random = () => {
+      randomCalls += 1;
+      return 0;
+    };
+    Object.defineProperty(globalThis.performance, 'now', {
+      configurable: true,
+      value: () => {
+        performanceCalls += 1;
+        return 0;
+      },
+    });
+
+    for (const scorePrefix of ['0000', '0x']) {
+      assert.throws(
+        () => raw.calculate_funnel_score('/api/auth/login', 'not-json', scorePrefix),
+        /unsupported conversion settings/,
+      );
+    }
+    assert.equal(clockCalls, 0);
+    assert.equal(randomCalls, 0);
+    assert.equal(performanceCalls, 0);
+  } finally {
+    Date.now = originalNow;
+    Math.random = originalRandom;
     Object.defineProperty(globalThis.performance, 'now', {
       configurable: true,
       value: originalPerformanceNow,
