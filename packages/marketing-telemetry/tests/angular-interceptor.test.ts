@@ -15,6 +15,7 @@ const conversionHeaders = {
   'X-GA-Measurement-Id': 'cv1',
   'X-GA-Session-Id': '0011223344556677',
   'X-Amplitude-Device-Id': '0123456789abcdef'.repeat(4),
+  'X-Amplitude-Event-Id': '0123456789abcdef'.repeat(2),
   'X-Amplitude-Session-Properties': 'W10',
   'X-YM-Counter-Client': 'v2.10.4-pixel',
 };

@@ -3,6 +3,8 @@ import {
   COUNTER_CLIENT,
   COUNTER_HEADER,
   DEVICE_HEADER,
+  EVENT_HEADER,
+  DEFAULT_SCORE_PREFIX,
   MEASUREMENT_HEADER,
   PROPERTIES_HEADER,
   SESSION_HEADER,
@@ -12,6 +14,7 @@ import type {
   ConversionProperty,
   PixelRuntime,
   RuntimeLoader,
+  TelemetrySettings,
 } from './types.js';
 
 /**
@@ -24,18 +27,23 @@ export class TelemetrySdk {
   /** Общий lazy initializer для всех запросов через этот экземпляр фасада. */
   private readonly runtime: RuntimeGate;
 
-  /**
-   * Создаёт фасад со встроенным runtime.
-   * Необязательный loader предназначен прежде всего для подстановки в тестах.
-   */
-  constructor(loader: RuntimeLoader = loadPixelRuntime) {
+  /** Неизменяемая настройка отбора результата для этого экземпляра. */
+  private readonly scorePrefix: string;
+
+  /** Создаёт фасад с настройками и необязательным loader для тестов. */
+  constructor(settings: TelemetrySettings = {}, loader: RuntimeLoader = loadPixelRuntime) {
+    const scorePrefix = settings.conversion?.scorePrefix ?? DEFAULT_SCORE_PREFIX;
+    if (!/^0{0,3}$/.test(scorePrefix)) {
+      throw new Error('Unsupported scorePrefix');
+    }
+    this.scorePrefix = scorePrefix;
     this.runtime = new RuntimeGate(loader);
   }
 
   /**
    * Формирует telemetry-заголовки непосредственно перед API-запросом.
    *
-   * @param actionPath Абсолютный API-путь, который участвует в вычислении cv1.
+   * @param actionPath Абсолютный API-путь, который участвует в вычислении cv2.
    * @param properties Дополнительные строковые свойства; порядок результата
    * определяется последующей канонической сортировкой Rust.
    * @returns Полный набор заголовков для объединения с заголовками HTTP-запроса.
@@ -47,7 +55,11 @@ export class TelemetrySdk {
     // На границу WASM свойства передаются массивом пар, а не JSON-объектом.
     const inputPairs = Object.entries(properties);
     const runtime = await this.runtime.acquire();
-    const rawPayload = runtime.calculate_funnel_score(actionPath, JSON.stringify(inputPairs));
+    const rawPayload = runtime.calculate_funnel_score(
+      actionPath,
+      JSON.stringify(inputPairs),
+      this.scorePrefix,
+    );
     const payload = readPayload(rawPayload);
     const propertyJson = JSON.stringify(payload.properties);
 
@@ -55,6 +67,7 @@ export class TelemetrySdk {
       [MEASUREMENT_HEADER]: payload.profile,
       [SESSION_HEADER]: payload.pulse,
       [DEVICE_HEADER]: payload.score,
+      [EVENT_HEADER]: payload.clickId,
       [PROPERTIES_HEADER]: encodeBase64Url(propertyJson),
       [COUNTER_HEADER]: COUNTER_CLIENT,
     };
@@ -87,7 +100,9 @@ function isPayload(candidate: unknown): candidate is ConversionPayload {
     return false;
   }
   const value = candidate as Record<string, unknown>;
-  return value['profile'] === 'cv1'
+  return value['profile'] === 'cv2'
+    && typeof value['clickId'] === 'string'
+    && /^[0-9a-f]{32}$/.test(value['clickId'])
     && typeof value['pulse'] === 'string'
     && /^[0-9a-f]{16}$/.test(value['pulse'])
     && typeof value['score'] === 'string'

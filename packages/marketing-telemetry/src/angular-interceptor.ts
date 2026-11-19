@@ -3,9 +3,11 @@ import { HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { inject, InjectionToken } from '@angular/core';
 import { catchError, from, of, switchMap } from 'rxjs';
 import { TelemetrySdk } from './conversion.js';
+import type { TelemetrySettings } from './types.js';
 import {
   COUNTER_HEADER,
   DEVICE_HEADER,
+  EVENT_HEADER,
   MEASUREMENT_HEADER,
   PROPERTIES_HEADER,
   SESSION_HEADER,
@@ -15,14 +17,21 @@ const TELEMETRY_HEADER_NAMES = [
   MEASUREMENT_HEADER,
   SESSION_HEADER,
   DEVICE_HEADER,
+  EVENT_HEADER,
   PROPERTIES_HEADER,
   COUNTER_HEADER,
 ] as const;
 
+/** Настройки telemetry, доступные для обычного Angular providers API. */
+export const TELEMETRY_SETTINGS = new InjectionToken<TelemetrySettings>('MARKETING_TELEMETRY_SETTINGS', {
+  providedIn: 'root',
+  factory: () => ({}),
+});
+
 /** Один browser runtime на root injector приложения. */
 export const TELEMETRY_SDK = new InjectionToken<TelemetrySdk>('MARKETING_TELEMETRY_SDK', {
   providedIn: 'root',
-  factory: () => new TelemetrySdk(),
+  factory: () => new TelemetrySdk(inject(TELEMETRY_SETTINGS)),
 });
 
 /** Извлекает путь, совпадающий с серверным journey без query и fragment. */

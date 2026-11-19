@@ -1,7 +1,15 @@
+/** Настройки публичного conversion-фасада. */
+export interface TelemetrySettings {
+  conversion?: {
+    /** От одного до трёх нулевых hex-символов; пустая строка отключает отбор. */
+    scorePrefix?: string;
+  };
+}
+
 /** Минимальная поверхность generated WASM, необходимая TypeScript-фасаду. */
 export interface PixelRuntime {
-  /** Выполняет вычисление cv1 и возвращает результат в виде JSON-строки. */
-  calculate_funnel_score(journey: string, propertiesJson: string): string;
+  /** Выполняет вычисление cv2 и возвращает результат в виде JSON-строки. */
+  calculate_funnel_score(journey: string, propertiesJson: string, scorePrefix: string): string;
 }
 
 /** Асинхронная граница, которая загружает и инициализирует runtime без аргументов. */
@@ -12,8 +20,10 @@ export type ConversionProperty = [name: string, value: string];
 
 /** Ожидаемая форма JSON, который TypeScript получает от WASM. */
 export interface ConversionPayload {
-  /** Версия conversion-контракта; текущая реализация использует `cv1`. */
+  /** Версия conversion-контракта; текущая реализация использует `cv2`. */
   profile: string;
+  /** Финальный 128-битный идентификатор события в lowercase hex. */
+  clickId: string;
   /** Обратимое представление точного Unix timestamp в секундах. */
   pulse: string;
   /** Итоговые 64 hex-символа, передаваемые в заголовке без изменений. */
