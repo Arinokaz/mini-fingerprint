@@ -81,3 +81,34 @@ async function validateFixture(profile) {
 
 await validateFixture('cv1');
 await validateFixture('cv2');
+
+/** Проверяет структуру независимого product analytics профиля. */
+async function validateProductAnalytics() {
+  const fixture = JSON.parse(await readFile(
+    new URL('../tests/fixtures/product-analytics-v1.json', import.meta.url),
+    'utf8',
+  ));
+  assert.equal(fixture.profile, 'pa1');
+  assert.equal(fixture.constants.initial.length, 4);
+  assert.ok(Array.isArray(fixture.cases) && fixture.cases.length >= 4);
+  const names = new Set();
+  for (const testCase of fixture.cases) {
+    assert.ok(testCase.name && !names.has(testCase.name));
+    names.add(testCase.name);
+    assert.match(testCase.score, /^[0-9a-f]{32}$/);
+    assert.match(testCase.pulse, /^[0-9a-f]{16}$/);
+    assert.match(testCase.viewId, /^[0-9a-f]{32}$/);
+    assert.match(testCase.eventId, /^[0-9a-f]{32}$/);
+    assert.equal(testCase.decodedTimestamp, testCase.timestamp);
+    assert.equal(typeof testCase.expectedServerMatch, 'boolean');
+    for (const stage of ['page', 'view', 'event', 'time']) {
+      assert.ok(Array.isArray(testCase.frames[stage]) && testCase.frames[stage].length === 4);
+      for (const lane of testCase.frames[stage]) {
+        assert.match(lane, /^[0-9a-f]{8}$/);
+      }
+    }
+  }
+  console.log(`pa1: ${fixture.cases.length} golden cases validated.`);
+}
+
+await validateProductAnalytics();

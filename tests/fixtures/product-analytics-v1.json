@@ -1,0 +1,309 @@
+{
+  "profile": "pa1",
+  "constants": {
+    "initial": [
+      "6a09e667",
+      "bb67ae85",
+      "3c6ef372",
+      "a54ff53a"
+    ],
+    "multipliers": [
+      "9e3779b1",
+      "85ebca6b",
+      "c2b2ae35",
+      "27d4eb2f"
+    ],
+    "additives": [
+      "7f4a7c15",
+      "6a09e667",
+      "bb67ae85",
+      "3c6ef372"
+    ],
+    "permutation": [
+      2,
+      0,
+      3,
+      1
+    ],
+    "domains": {
+      "page": "35",
+      "view": "8e",
+      "event": "59",
+      "time": "d4"
+    },
+    "rounds": {
+      "page": 2,
+      "view": 3,
+      "event": 2,
+      "time": 3
+    }
+  },
+  "cases": [
+    {
+      "name": "login-production-valid",
+      "actionPath": "/api/auth/login",
+      "selectedView": "production-view-2026.11",
+      "viewId": "802fe4cf8b0100000000000000000000",
+      "eventId": "812fe4cf8b0100000000000000000000",
+      "timestamp": 1699999920,
+      "expectedServerMatch": true,
+      "frames": {
+        "page": [
+          "5e834669",
+          "fdaff086",
+          "6bfed1e9",
+          "0a1046f6"
+        ],
+        "view": [
+          "c0707623",
+          "b3c8f31d",
+          "e50e853c",
+          "55ed9937"
+        ],
+        "event": [
+          "0107b3ae",
+          "5239d1d6",
+          "ca587008",
+          "d3684487"
+        ],
+        "time": [
+          "d66f3701",
+          "ccc61d53",
+          "ea88355d",
+          "081f8a20"
+        ]
+      },
+      "pulse": "bb025b9dd65a5525",
+      "score": "01376fd6531dc6cc5d3588ea208a1f08",
+      "decodedTimestamp": 1699999920
+    },
+    {
+      "name": "login-production-missing",
+      "actionPath": "/api/auth/login",
+      "selectedView": "analytics.unresolved.v1",
+      "viewId": "802fe4cf8b0100000000000000000000",
+      "eventId": "822fe4cf8b0100000000000000000000",
+      "timestamp": 1699999920,
+      "expectedServerMatch": false,
+      "frames": {
+        "page": [
+          "5e834669",
+          "fdaff086",
+          "6bfed1e9",
+          "0a1046f6"
+        ],
+        "view": [
+          "ca6e4f1d",
+          "0cff7d77",
+          "ba06e422",
+          "4108826a"
+        ],
+        "event": [
+          "0c301215",
+          "3660f3bd",
+          "5a160144",
+          "75756dce"
+        ],
+        "time": [
+          "867c463c",
+          "3bd1e9bf",
+          "e8ba698c",
+          "0ff10d02"
+        ]
+      },
+      "pulse": "bb025b9dd65a5525",
+      "score": "3c467c86bfe9d13b8c69bae8020df10f",
+      "decodedTimestamp": 1699999920
+    },
+    {
+      "name": "login-production-empty",
+      "actionPath": "/api/auth/login",
+      "selectedView": "analytics.unresolved.v1",
+      "viewId": "802fe4cf8b0100000000000000000000",
+      "eventId": "832fe4cf8b0100000000000000000000",
+      "timestamp": 1699999920,
+      "expectedServerMatch": false,
+      "frames": {
+        "page": [
+          "5e834669",
+          "fdaff086",
+          "6bfed1e9",
+          "0a1046f6"
+        ],
+        "view": [
+          "ca6e4f1d",
+          "0cff7d77",
+          "ba06e422",
+          "4108826a"
+        ],
+        "event": [
+          "3cc51956",
+          "172e449e",
+          "ba0da685",
+          "af99764b"
+        ],
+        "time": [
+          "e3762caf",
+          "d24ebfad",
+          "e82a3e8d",
+          "2a7512bf"
+        ]
+      },
+      "pulse": "bb025b9dd65a5525",
+      "score": "af2c76e3adbf4ed28d3e2ae8bf12752a",
+      "decodedTimestamp": 1699999920
+    },
+    {
+      "name": "login-production-duplicate",
+      "actionPath": "/api/auth/login",
+      "selectedView": "analytics.unresolved.v1",
+      "viewId": "802fe4cf8b0100000000000000000000",
+      "eventId": "842fe4cf8b0100000000000000000000",
+      "timestamp": 1699999920,
+      "expectedServerMatch": false,
+      "frames": {
+        "page": [
+          "5e834669",
+          "fdaff086",
+          "6bfed1e9",
+          "0a1046f6"
+        ],
+        "view": [
+          "ca6e4f1d",
+          "0cff7d77",
+          "ba06e422",
+          "4108826a"
+        ],
+        "event": [
+          "b5f12c7c",
+          "55bce5ad",
+          "b96f95f2",
+          "2119bb51"
+        ],
+        "time": [
+          "711a4c1d",
+          "c65058cd",
+          "6ce307ec",
+          "af58da53"
+        ]
+      },
+      "pulse": "bb025b9dd65a5525",
+      "score": "1d4c1a71cd5850c6ec07e36c53da58af",
+      "decodedTimestamp": 1699999920
+    },
+    {
+      "name": "register-production-valid",
+      "actionPath": "/api/auth/register",
+      "selectedView": "production-view-2026.11",
+      "viewId": "802fe4cf8b0100000000000000000000",
+      "eventId": "852fe4cf8b0100000000000000000000",
+      "timestamp": 1699999920,
+      "expectedServerMatch": true,
+      "frames": {
+        "page": [
+          "dc19a31f",
+          "1604a309",
+          "5aefd246",
+          "c4bdd7f3"
+        ],
+        "view": [
+          "878ce149",
+          "e3d3f649",
+          "567090c6",
+          "d36646a2"
+        ],
+        "event": [
+          "53c0b6c9",
+          "d548356c",
+          "45974e97",
+          "78eeecd7"
+        ],
+        "time": [
+          "58338cfa",
+          "ee3cf3e4",
+          "054e4b15",
+          "e74f68f1"
+        ]
+      },
+      "pulse": "bb025b9dd65a5525",
+      "score": "fa8c3358e4f33cee154b4e05f1684fe7",
+      "decodedTimestamp": 1699999920
+    },
+    {
+      "name": "login-development-valid",
+      "actionPath": "/api/auth/login",
+      "selectedView": "development-view-2026.11",
+      "viewId": "000102030405060708090a0b0c0d0e0f",
+      "eventId": "101112131415161718191a1b1c1d1e1f",
+      "timestamp": 1699999920,
+      "expectedServerMatch": true,
+      "frames": {
+        "page": [
+          "5e834669",
+          "fdaff086",
+          "6bfed1e9",
+          "0a1046f6"
+        ],
+        "view": [
+          "97f67493",
+          "bb670e3c",
+          "6e79518c",
+          "0d37832a"
+        ],
+        "event": [
+          "3b8bc1ca",
+          "0f237ac2",
+          "ffb44052",
+          "dc586cad"
+        ],
+        "time": [
+          "7b2bffe7",
+          "96f56604",
+          "d43950e4",
+          "e0a0f63a"
+        ]
+      },
+      "pulse": "bb025b9dd65a5525",
+      "score": "e7ff2b7b0466f596e45039d43af6a0e0",
+      "decodedTimestamp": 1699999920
+    },
+    {
+      "name": "login-development-duplicate",
+      "actionPath": "/api/auth/login",
+      "selectedView": "analytics.unresolved.v1",
+      "viewId": "000102030405060708090a0b0c0d0e0f",
+      "eventId": "101112131415161718191a1b1c1d1e1f",
+      "timestamp": 1699999920,
+      "expectedServerMatch": false,
+      "frames": {
+        "page": [
+          "5e834669",
+          "fdaff086",
+          "6bfed1e9",
+          "0a1046f6"
+        ],
+        "view": [
+          "ca6e4f1d",
+          "0cff7d77",
+          "ba06e422",
+          "4108826a"
+        ],
+        "event": [
+          "f4a0e8c2",
+          "2e04201a",
+          "4a2790d4",
+          "101b967b"
+        ],
+        "time": [
+          "bcff1538",
+          "a2b0a223",
+          "9ea66442",
+          "80e2d06b"
+        ]
+      },
+      "pulse": "bb025b9dd65a5525",
+      "score": "3815ffbc23a2b0a24264a69e6bd0e280",
+      "decodedTimestamp": 1699999920
+    }
+  ]
+}
