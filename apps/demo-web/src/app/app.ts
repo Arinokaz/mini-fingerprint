@@ -16,6 +16,8 @@ import { ApiJourney, ConversionDemoService } from './conversion-demo.service';
 export class App {
   /** DOM marker текущей сборки, передаваемый в шаблон через data-tag. */
   protected readonly touchpoint = environment.touchpoint;
+  /** Marker независимого product analytics view. */
+  protected readonly analyticsView = environment.analyticsView;
   /** Краткое состояние операции без внутренних технических подробностей. */
   protected readonly status = signal('Выберите действие.');
   /** Запрещает повторный submit, пока предыдущая операция не завершилась. */
