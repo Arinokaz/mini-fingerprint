@@ -1,5 +1,6 @@
 //! Чистые conversion-примитивы, используемые браузерным telemetry-фасадом.
 
+pub mod click;
 pub mod codec;
 pub mod frame;
 pub mod journey;

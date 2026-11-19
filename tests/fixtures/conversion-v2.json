@@ -1,0 +1,745 @@
+{
+  "profile": "cv2",
+  "constants": {
+    "initial": [
+      "243f6a88",
+      "85a308d3",
+      "13198a2e",
+      "03707344",
+      "a4093822",
+      "299f31d0",
+      "082efa98",
+      "ec4e6c89"
+    ],
+    "multipliers": [
+      "9e3779b1",
+      "85ebca6b",
+      "c2b2ae35",
+      "27d4eb2f",
+      "165667b1",
+      "d3a2646d",
+      "fd7046c5",
+      "b55a4f09"
+    ],
+    "additives": [
+      "7f4a7c15",
+      "6a09e667",
+      "bb67ae85",
+      "3c6ef372",
+      "a54ff53a",
+      "510e527f",
+      "1f83d9ab",
+      "5be0cd19"
+    ],
+    "permutation": [
+      3,
+      7,
+      1,
+      6,
+      0,
+      4,
+      2,
+      5
+    ],
+    "substitution": [
+      6,
+      11,
+      3,
+      13,
+      8,
+      0,
+      15,
+      5,
+      10,
+      2,
+      12,
+      7,
+      1,
+      14,
+      4,
+      9
+    ],
+    "domains": {
+      "journey": "4a",
+      "touchpoint": "b7",
+      "properties": "d9",
+      "pulse": "e3",
+      "click": "c1"
+    },
+    "rounds": {
+      "journey": 4,
+      "touchpoint": 4,
+      "properties": 4,
+      "pulse": 8,
+      "click": 4
+    },
+    "fallbackTouchpoint": "telemetry.unresolved.v1",
+    "pulse": {
+      "key0": "a53c9e17",
+      "key1": "6d2b79f5",
+      "add0": "9e3779b9",
+      "add1": "7f4a7c15"
+    },
+    "reservedProperties": [
+      "sys.journey",
+      "sys.touchpoint",
+      "sys.pulse",
+      "sys.profile"
+    ]
+  },
+  "arithmetic": [
+    {
+      "operation": "add32",
+      "a": "ffffffff",
+      "b": "00000001",
+      "result": "00000000"
+    },
+    {
+      "operation": "add32",
+      "a": "7fffffff",
+      "b": "00000001",
+      "result": "80000000"
+    },
+    {
+      "operation": "mul32",
+      "a": "ffffffff",
+      "b": "ffffffff",
+      "result": "00000001"
+    },
+    {
+      "operation": "mul32",
+      "a": "12345678",
+      "b": "9e3779b1",
+      "result": "f6d680f8"
+    },
+    {
+      "operation": "rotl32",
+      "a": "80000001",
+      "b": 1,
+      "result": "00000003"
+    },
+    {
+      "operation": "rotl32",
+      "a": "12345678",
+      "b": 0,
+      "result": "12345678"
+    }
+  ],
+  "cases": [
+    {
+      "name": "login-production-valid",
+      "journey": "/api/auth/login",
+      "anchorState": "valid",
+      "observedTag": "production-build-tag",
+      "selectedTag": "production-build-tag",
+      "inputProperties": [],
+      "canonicalPropertiesJson": "[]",
+      "canonicalPropertiesHex": "",
+      "now": 1699999920,
+      "pulse": "e4101bc8af581d85",
+      "stages": {
+        "journey": [
+          "3cd54917",
+          "345b40c8",
+          "7b6e58f6",
+          "49686d88",
+          "bfd3b1f6",
+          "483965a0",
+          "50088dff",
+          "373321eb"
+        ],
+        "touchpoint": [
+          "3989a0dc",
+          "fe511bc0",
+          "baaa7854",
+          "3c239268",
+          "7d1caa30",
+          "8a9588b1",
+          "7e14a12a",
+          "579fe3bf"
+        ],
+        "properties": [
+          "ad973209",
+          "05ccf36b",
+          "8c8e7c51",
+          "56ddeef2",
+          "9fe18396",
+          "8c093576",
+          "97398a1e",
+          "98ef212c"
+        ],
+        "click": [
+          "7fdabd6e",
+          "26956267",
+          "d8d3392f",
+          "bc65731e",
+          "a0626593",
+          "e9dd1003",
+          "f1454d4b",
+          "54041b9b"
+        ],
+        "pulse": [
+          "87a96300",
+          "23fbc399",
+          "0374ac09",
+          "42055337",
+          "fd243aa3",
+          "82a1ea15",
+          "37f4283b",
+          "855f12f6"
+        ]
+      },
+      "score": "0063a98799c3fb2309ac740337530542a33a24fd15eaa1823b28f437f6125f85",
+      "expectedServerMatch": true,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920,
+      "scorePrefix": "00",
+      "initialClickId": "802fe4cf8b0100000000000000000000",
+      "clickId": "ac2fe4cf8b0100000000000000000000",
+      "attempts": 45
+    },
+    {
+      "name": "login-production-missing",
+      "journey": "/api/auth/login",
+      "anchorState": "missing",
+      "observedTag": null,
+      "selectedTag": "telemetry.unresolved.v1",
+      "inputProperties": [],
+      "canonicalPropertiesJson": "[]",
+      "canonicalPropertiesHex": "",
+      "now": 1699999920,
+      "pulse": "e4101bc8af581d85",
+      "stages": {
+        "journey": [
+          "3cd54917",
+          "345b40c8",
+          "7b6e58f6",
+          "49686d88",
+          "bfd3b1f6",
+          "483965a0",
+          "50088dff",
+          "373321eb"
+        ],
+        "touchpoint": [
+          "d0b5e081",
+          "613db1f3",
+          "b333e5d7",
+          "bb0bd8cb",
+          "cdb34057",
+          "b1c39bc7",
+          "729eedac",
+          "9effa399"
+        ],
+        "properties": [
+          "3f6b680b",
+          "1ffb21f0",
+          "36c32a85",
+          "441794d7",
+          "e40a602e",
+          "8a37bafb",
+          "290c64c2",
+          "aabbbebf"
+        ],
+        "click": [
+          "df384a4e",
+          "199f0f81",
+          "5f6d955b",
+          "5fd09064",
+          "589b86ea",
+          "684f5598",
+          "d82cbf6b",
+          "7c7bf1de"
+        ],
+        "pulse": [
+          "ff3d9d00",
+          "3807f3c4",
+          "a7e19104",
+          "0fea28e7",
+          "e5861e30",
+          "54908dc6",
+          "47ff412c",
+          "97851125"
+        ]
+      },
+      "score": "009d3dffc4f307380491e1a7e728ea0f301e86e5c68d90542c41ff4725118597",
+      "expectedServerMatch": false,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920,
+      "scorePrefix": "00",
+      "initialClickId": "802fe4cf8b0100000000000001000000",
+      "clickId": "a830e4cf8b0100000000000001000000",
+      "attempts": 297
+    },
+    {
+      "name": "login-production-empty",
+      "journey": "/api/auth/login",
+      "anchorState": "empty",
+      "observedTag": "",
+      "selectedTag": "telemetry.unresolved.v1",
+      "inputProperties": [],
+      "canonicalPropertiesJson": "[]",
+      "canonicalPropertiesHex": "",
+      "now": 1699999920,
+      "pulse": "e4101bc8af581d85",
+      "stages": {
+        "journey": [
+          "3cd54917",
+          "345b40c8",
+          "7b6e58f6",
+          "49686d88",
+          "bfd3b1f6",
+          "483965a0",
+          "50088dff",
+          "373321eb"
+        ],
+        "touchpoint": [
+          "d0b5e081",
+          "613db1f3",
+          "b333e5d7",
+          "bb0bd8cb",
+          "cdb34057",
+          "b1c39bc7",
+          "729eedac",
+          "9effa399"
+        ],
+        "properties": [
+          "3f6b680b",
+          "1ffb21f0",
+          "36c32a85",
+          "441794d7",
+          "e40a602e",
+          "8a37bafb",
+          "290c64c2",
+          "aabbbebf"
+        ],
+        "click": [
+          "0b2b04f2",
+          "39e426e5",
+          "5b2625cd",
+          "eee4fac8",
+          "0206cdc2",
+          "536994c5",
+          "9d9f5f05",
+          "68876d14"
+        ],
+        "pulse": [
+          "7303f600",
+          "6d0e6ff8",
+          "dd4822d4",
+          "7baad973",
+          "fcb7aa1e",
+          "1ae3bb8c",
+          "1b1c469d",
+          "54648f6e"
+        ]
+      },
+      "score": "00f60373f86f0e6dd42248dd73d9aa7b1eaab7fc8cbbe31a9d461c1b6e8f6454",
+      "expectedServerMatch": false,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920,
+      "scorePrefix": "00",
+      "initialClickId": "802fe4cf8b0100000000000002000000",
+      "clickId": "bc30e4cf8b0100000000000002000000",
+      "attempts": 317
+    },
+    {
+      "name": "login-production-duplicate",
+      "journey": "/api/auth/login",
+      "anchorState": "duplicate",
+      "observedTag": null,
+      "selectedTag": "telemetry.unresolved.v1",
+      "inputProperties": [],
+      "canonicalPropertiesJson": "[]",
+      "canonicalPropertiesHex": "",
+      "now": 1699999920,
+      "pulse": "e4101bc8af581d85",
+      "stages": {
+        "journey": [
+          "3cd54917",
+          "345b40c8",
+          "7b6e58f6",
+          "49686d88",
+          "bfd3b1f6",
+          "483965a0",
+          "50088dff",
+          "373321eb"
+        ],
+        "touchpoint": [
+          "d0b5e081",
+          "613db1f3",
+          "b333e5d7",
+          "bb0bd8cb",
+          "cdb34057",
+          "b1c39bc7",
+          "729eedac",
+          "9effa399"
+        ],
+        "properties": [
+          "3f6b680b",
+          "1ffb21f0",
+          "36c32a85",
+          "441794d7",
+          "e40a602e",
+          "8a37bafb",
+          "290c64c2",
+          "aabbbebf"
+        ],
+        "click": [
+          "eff4aab8",
+          "2b0351dd",
+          "7da33c6b",
+          "d8fcd808",
+          "1ad39ed5",
+          "d3fc21df",
+          "76e563db",
+          "d693ccb2"
+        ],
+        "pulse": [
+          "43dd4e00",
+          "cf5a83a0",
+          "56c3bc8b",
+          "dd5aff10",
+          "fe92e491",
+          "e76d7875",
+          "d805e22b",
+          "9d986a1a"
+        ]
+      },
+      "score": "004edd43a0835acf8bbcc35610ff5add91e492fe75786de72be205d81a6a989d",
+      "expectedServerMatch": false,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920,
+      "scorePrefix": "00",
+      "initialClickId": "802fe4cf8b0100000000000003000000",
+      "clickId": "7330e4cf8b0100000000000003000000",
+      "attempts": 244
+    },
+    {
+      "name": "register-production-valid",
+      "journey": "/api/auth/register",
+      "anchorState": "valid",
+      "observedTag": "production-build-tag",
+      "selectedTag": "production-build-tag",
+      "inputProperties": [],
+      "canonicalPropertiesJson": "[]",
+      "canonicalPropertiesHex": "",
+      "now": 1699999920,
+      "pulse": "e4101bc8af581d85",
+      "stages": {
+        "journey": [
+          "c1ee5c1b",
+          "7de3ed90",
+          "be0900b1",
+          "2688bef6",
+          "9a03b896",
+          "7489e938",
+          "89bb3422",
+          "2afa3097"
+        ],
+        "touchpoint": [
+          "0d366db1",
+          "26f5e0e5",
+          "f2157966",
+          "d200c7f9",
+          "254f87f8",
+          "d2985d61",
+          "b6bc4adf",
+          "1a335249"
+        ],
+        "properties": [
+          "7cdbb18e",
+          "96651dab",
+          "55953d40",
+          "016e6152",
+          "185cf987",
+          "7ecb0419",
+          "556d340e",
+          "b26f1a18"
+        ],
+        "click": [
+          "49bd9280",
+          "930681f9",
+          "9878ada8",
+          "66e48367",
+          "109a627f",
+          "8c359ecf",
+          "ad0ab82b",
+          "4c70efc4"
+        ],
+        "pulse": [
+          "32264300",
+          "fc0bd4eb",
+          "b952d557",
+          "e3119a5c",
+          "1980ecfd",
+          "66b878cf",
+          "8663696b",
+          "6895cb0c"
+        ]
+      },
+      "score": "00432632ebd40bfc57d552b95c9a11e3fdec8019cf78b8666b6963860ccb9568",
+      "expectedServerMatch": true,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920,
+      "scorePrefix": "00",
+      "initialClickId": "802fe4cf8b0100000000000004000000",
+      "clickId": "ce2fe4cf8b0100000000000004000000",
+      "attempts": 79
+    },
+    {
+      "name": "login-valid-empty-prefix",
+      "journey": "/api/auth/login",
+      "anchorState": "valid",
+      "observedTag": "dsf3fdfgdfg",
+      "selectedTag": "dsf3fdfgdfg",
+      "inputProperties": [
+        [
+          "z.last",
+          "привет"
+        ],
+        [
+          "a.first",
+          "value:with:colon"
+        ],
+        [
+          "empty",
+          ""
+        ]
+      ],
+      "canonicalPropertiesJson": "[[\"a.first\",\"value:with:colon\"],[\"empty\",\"\"],[\"z.last\",\"привет\"]]",
+      "canonicalPropertiesHex": "07000000612e66697273741000000076616c75653a776974683a636f6c6f6e05000000656d70747900000000060000007a2e6c6173740c000000d0bfd180d0b8d0b2d0b5d182",
+      "now": 1699999920,
+      "pulse": "e4101bc8af581d85",
+      "stages": {
+        "journey": [
+          "3cd54917",
+          "345b40c8",
+          "7b6e58f6",
+          "49686d88",
+          "bfd3b1f6",
+          "483965a0",
+          "50088dff",
+          "373321eb"
+        ],
+        "touchpoint": [
+          "4ece92f7",
+          "77d26a96",
+          "4cd458d9",
+          "4c4fd927",
+          "43060c18",
+          "e5917004",
+          "ad387e97",
+          "d5b449fd"
+        ],
+        "properties": [
+          "8bc007e4",
+          "1a1813b5",
+          "6344e406",
+          "8ff07533",
+          "90e8caf9",
+          "ce901261",
+          "472ef2f1",
+          "2b31f574"
+        ],
+        "click": [
+          "a2cce629",
+          "a132853f",
+          "7216e2e9",
+          "1ee626a8",
+          "78d848af",
+          "4453cb45",
+          "7f67fdd9",
+          "ff123feb"
+        ],
+        "pulse": [
+          "ce60eca5",
+          "479ab5e2",
+          "58740a2a",
+          "b414ab43",
+          "d8eddd55",
+          "f34ed794",
+          "08724ae2",
+          "3b715616"
+        ]
+      },
+      "score": "a5ec60cee2b59a472a0a745843ab14b455ddedd894d74ef3e24a72081656713b",
+      "expectedServerMatch": true,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920,
+      "scorePrefix": "",
+      "initialClickId": "000102030405060708090a0b0c0d0e0f",
+      "clickId": "000102030405060708090a0b0c0d0e0f",
+      "attempts": 1
+    },
+    {
+      "name": "login-valid-one-zero",
+      "journey": "/api/auth/login",
+      "anchorState": "valid",
+      "observedTag": "dsf3fdfgdfg",
+      "selectedTag": "dsf3fdfgdfg",
+      "inputProperties": [
+        [
+          "z.last",
+          "привет"
+        ],
+        [
+          "a.first",
+          "value:with:colon"
+        ],
+        [
+          "empty",
+          ""
+        ]
+      ],
+      "canonicalPropertiesJson": "[[\"a.first\",\"value:with:colon\"],[\"empty\",\"\"],[\"z.last\",\"привет\"]]",
+      "canonicalPropertiesHex": "07000000612e66697273741000000076616c75653a776974683a636f6c6f6e05000000656d70747900000000060000007a2e6c6173740c000000d0bfd180d0b8d0b2d0b5d182",
+      "now": 1699999920,
+      "pulse": "e4101bc8af581d85",
+      "stages": {
+        "journey": [
+          "3cd54917",
+          "345b40c8",
+          "7b6e58f6",
+          "49686d88",
+          "bfd3b1f6",
+          "483965a0",
+          "50088dff",
+          "373321eb"
+        ],
+        "touchpoint": [
+          "4ece92f7",
+          "77d26a96",
+          "4cd458d9",
+          "4c4fd927",
+          "43060c18",
+          "e5917004",
+          "ad387e97",
+          "d5b449fd"
+        ],
+        "properties": [
+          "8bc007e4",
+          "1a1813b5",
+          "6344e406",
+          "8ff07533",
+          "90e8caf9",
+          "ce901261",
+          "472ef2f1",
+          "2b31f574"
+        ],
+        "click": [
+          "d29c40c4",
+          "bc8a25f4",
+          "a1671ecf",
+          "720f862f",
+          "29268f4a",
+          "01e4a06d",
+          "a29ff82d",
+          "58b3d55a"
+        ],
+        "pulse": [
+          "3a83c307",
+          "d9585796",
+          "7fab39de",
+          "db7d2c7c",
+          "138776e8",
+          "eadf4d5f",
+          "2986c245",
+          "5506f014"
+        ]
+      },
+      "score": "07c3833a965758d9de39ab7f7c2c7ddbe87687135f4ddfea45c2862914f00655",
+      "expectedServerMatch": true,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920,
+      "scorePrefix": "0",
+      "initialClickId": "00112233445566778899aabbccddeeff",
+      "clickId": "05112233445566778899aabbccddeeff",
+      "attempts": 6
+    },
+    {
+      "name": "login-valid-three-zero",
+      "journey": "/api/auth/login",
+      "anchorState": "valid",
+      "observedTag": "dsf3fdfgdfg",
+      "selectedTag": "dsf3fdfgdfg",
+      "inputProperties": [
+        [
+          "z.last",
+          "привет"
+        ],
+        [
+          "a.first",
+          "value:with:colon"
+        ],
+        [
+          "empty",
+          ""
+        ]
+      ],
+      "canonicalPropertiesJson": "[[\"a.first\",\"value:with:colon\"],[\"empty\",\"\"],[\"z.last\",\"привет\"]]",
+      "canonicalPropertiesHex": "07000000612e66697273741000000076616c75653a776974683a636f6c6f6e05000000656d70747900000000060000007a2e6c6173740c000000d0bfd180d0b8d0b2d0b5d182",
+      "now": 1699999920,
+      "pulse": "e4101bc8af581d85",
+      "stages": {
+        "journey": [
+          "3cd54917",
+          "345b40c8",
+          "7b6e58f6",
+          "49686d88",
+          "bfd3b1f6",
+          "483965a0",
+          "50088dff",
+          "373321eb"
+        ],
+        "touchpoint": [
+          "4ece92f7",
+          "77d26a96",
+          "4cd458d9",
+          "4c4fd927",
+          "43060c18",
+          "e5917004",
+          "ad387e97",
+          "d5b449fd"
+        ],
+        "properties": [
+          "8bc007e4",
+          "1a1813b5",
+          "6344e406",
+          "8ff07533",
+          "90e8caf9",
+          "ce901261",
+          "472ef2f1",
+          "2b31f574"
+        ],
+        "click": [
+          "e22492d6",
+          "3a987bd3",
+          "f6417dbc",
+          "647fc603",
+          "93c5a447",
+          "f558859c",
+          "abc83f3e",
+          "79de91ca"
+        ],
+        "pulse": [
+          "72e10800",
+          "50a908f2",
+          "bbd66010",
+          "bb28ca56",
+          "0b428f85",
+          "4b6ee1c4",
+          "b92fab9c",
+          "e53398d3"
+        ]
+      },
+      "score": "0008e172f208a9501060d6bb56ca28bb858f420bc4e16e4b9cab2fb9d39833e5",
+      "expectedServerMatch": true,
+      "selectedTimestamp": 1699999920,
+      "decodedTimestamp": 1699999920,
+      "scorePrefix": "000",
+      "initialClickId": "ffeeddccbbaa99887766554433221100",
+      "clickId": "2bfaddccbbaa99887766554433221100",
+      "attempts": 2861
+    }
+  ]
+}
