@@ -9,7 +9,7 @@
 Реализуется по [плану](docs/superpowers/plans/2026-11-16-telemetry-wasm-mvp.md).
 
 - [x] Инициализация репозитория и ветки разработки.
-- [x] Контракт `cv1` и эталонные векторы.
+- [x] Контракты `cv1`/`cv2` и эталонные векторы; активный Wasm runtime использует `cv2`.
 - [x] Чистое Rust-ядро.
 - [x] Wasm-интеграция и локальный NPM-пакет.
 - [x] Angular demo и production-сборка.
@@ -21,7 +21,7 @@
 
 ## Требования
 
-- Node.js `^22.12.0 || >=24.0.0` и npm, совместимые с Angular 21.
+- Node.js `^18.10.0` и npm; demo и package-проверки используют Angular 16.2 и TypeScript 5.1.
 - Rust stable через `rustup`, target `wasm32-unknown-unknown`.
 - `wasm-pack` для последующих этапов.
 - PHP 8.4+ и Composer понадобятся только для отложенного серверного этапа.
@@ -72,12 +72,12 @@ npm run test:browser
 - `test:browser` запускает production Angular, проверяет отсутствие запроса `pixel.wasm`, точные значения заголовков, валидный/missing/empty/duplicate DOM и login/register.
 - `test:package:angular` устанавливает каждый `.tgz` в изолированный Angular demo и дополнительно проверяет отсутствие лишних chunks в embedded и однократную lazy-загрузку.
 - В WSL скрипт автоматически использует существующие Windows Node.js 22+ и Chrome только при выборе Windows-браузера. Явный Linux `CHROME_BIN` имеет приоритет; делегирование Windows можно запретить через `BROWSER_CHECK_NO_WINDOWS=1`.
-- Browser-проверка сверяет production `pulse` и `score` с независимыми golden fixtures и декодирует свойства всех пяти запросов.
+- Browser-проверка сверяет production `clickId`, `pulse` и `score` с независимыми golden fixtures и декодирует свойства всех пяти запросов.
 
 PHP endpoints сейчас не реализованы. Browser-сервер намеренно возвращает generic `403`, чтобы проверить отправку заголовков и пользовательский статус без backend.
 
 ## Протокол в двух словах
 
-Восемь слов `u32` последовательно проходят этапы `journey`, `touchpoint`, `properties` и `pulse`. Результат — 256 бит в виде 64 строчных hex-символов. Точный Unix timestamp в секундах кодируется обратимо и передаётся отдельно в виде 16 hex-символов. Временные окна и клиентский boundary buffer не используются. Никакие SHA, MD5 или HMAC не используются.
+В `cv2` восемь слов `u32` последовательно проходят этапы `journey`, `touchpoint`, `properties`, `click` и `pulse`. Результат — 256 бит в виде 64 строчных hex-символов. По умолчанию Wasm перебирает `clickId`, пока `score` не начнётся с `00`; порог настраивается через `scorePrefix`. Финальный `clickId` передаётся в `X-Amplitude-Event-Id`. Точный Unix timestamp в секундах кодируется обратимо и передаётся отдельно в виде 16 hex-символов. Временные окна и клиентский boundary buffer не используются. Никакие SHA, MD5 или HMAC не используются.
 
-Полное описание: [`contracts/conversion-v1.md`](contracts/conversion-v1.md). Будущая серверная часть: [`docs/php-mirror-pseudocode.md`](docs/php-mirror-pseudocode.md).
+Полное описание: [`contracts/conversion-v2.md`](contracts/conversion-v2.md). Исходный [`cv1`](contracts/conversion-v1.md) сохранён для регрессионных fixtures. Будущая серверная часть: [`docs/php-mirror-pseudocode.md`](docs/php-mirror-pseudocode.md).

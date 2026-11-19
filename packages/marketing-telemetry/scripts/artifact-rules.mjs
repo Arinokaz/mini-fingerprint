@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-const bannedTerms = /(?:security|protection|secret|token|attack|bot|signature|authentication|authorization)/i;
+const bannedTerms = /(?:security|protection|secret|token|attack|bot|signature|authentication|authorization|nonce|challenge|proofofwork|mining|getrandomvalues)/i;
 
 /** Исключает длинные base64-литералы, чтобы случайные символы payload не влияли на поиск. */
 export function withoutEmbeddedPayload(source) {

@@ -20,7 +20,7 @@
 
 ## 2. Публичная точка входа `src/index.ts`
 
-Наружу экспортируются `TelemetrySdk`, `marketingTelemetryInterceptor` и тип `RuntimeLoader`. Обычному приложению достаточно:
+Наружу экспортируются `TelemetrySdk`, `marketingTelemetryInterceptor`, `TELEMETRY_SETTINGS`, `TelemetrySettings` и тип `RuntimeLoader`. Обычному приложению достаточно:
 
 ```typescript
 provideHttpClient(withInterceptors([marketingTelemetryInterceptor]))
@@ -39,12 +39,14 @@ Interceptor обрабатывает каждый `HttpClient`-запрос бе
 ### Создание
 
 ```typescript
-const telemetry = new TelemetrySdk();
+const telemetry = new TelemetrySdk({
+  conversion: { scorePrefix: '00' },
+});
 ```
 
-Конструктор имеет необязательный параметр `loader: RuntimeLoader = loadPixelRuntime`. Он создаёт `RuntimeGate`, но сам по себе WASM не инициализирует.
+Конструктор принимает `settings: TelemetrySettings = {}` и необязательный `loader: RuntimeLoader = loadPixelRuntime`. По умолчанию `scorePrefix = "00"`. Допустимы `""`, `"0"`, `"00"` и `"000"`; остальные значения отклоняются до инициализации runtime. Constructor создаёт `RuntimeGate`, но сам по себе WASM не инициализирует.
 
-Параметр `loader` прежде всего нужен TypeScript-тестам для подстановки контролируемого runtime. В обычном Angular-приложении его передавать не требуется.
+Параметр `loader` прежде всего нужен TypeScript-тестам. В Angular настройки передаются через provider `TELEMETRY_SETTINGS`; root `TELEMETRY_SDK` использует их при создании фасада.
 
 ### Метод `getConversionHeaders`
 
@@ -60,13 +62,13 @@ async getConversionHeaders(
 - `actionPath` — API-путь, например `/api/auth/login`;
 - `properties` — дополнительные строковые свойства; по умолчанию пустой объект.
 
-**Результат:** Promise с пятью заголовками, перечисленными в [`../architecture.md`](../architecture.md#3-что-возвращает-npm-пакет).
+**Результат:** Promise с шестью заголовками, перечисленными в [`../architecture.md`](../architecture.md#3-что-возвращает-npm-пакет).
 
 **Основная логика:**
 
 1. `Object.entries(properties)` превращает объект в массив пар и сохраняет порядок вставки.
 2. `this.runtime.acquire()` получает уже инициализированный runtime или запускает инициализацию.
-3. `calculate_funnel_score(actionPath, JSON.stringify(inputPairs))` вызывает Rust.
+3. `calculate_funnel_score(actionPath, JSON.stringify(inputPairs), this.scorePrefix)` вызывает Rust.
 4. `readPayload()` разбирает и проверяет JSON-ответ.
 5. Свойства повторно сериализуются из проверенного `payload.properties` и кодируются base64url.
 6. Метод возвращает все заголовки.
@@ -75,7 +77,7 @@ async getConversionHeaders(
 
 **Ошибки:** ошибки загрузки/инициализации и некорректный ответ runtime не превращаются в частичные заголовки; Promise отклоняется.
 
-**Инварианты:** нельзя независимо менять названия заголовков, формат `properties`, ожидаемый `profile=cv1` или порядок вычислений. Для этого нужны синхронные изменения контракта, backend и тестов.
+**Инварианты:** нельзя независимо менять названия заголовков, формат `properties`, ожидаемый `profile=cv2` или порядок вычислений. Для этого нужны синхронные изменения контракта, backend и тестов.
 
 ## 4. Внутренние функции `conversion.ts`
 
@@ -95,7 +97,8 @@ Type guard — функция, которая проверяет значени�
 Требует:
 
 - объект;
-- `profile === 'cv1'`;
+- `profile === 'cv2'`;
+- `clickId` из 32 строчных hex-символов;
 - `pulse` из 16 строчных hex-символов;
 - `score` из 64 строчных hex-символов;
 - массив `properties`, каждый элемент которого проходит `isProperty`.
@@ -174,16 +177,17 @@ Dynamic import — единая точка, которую сборщик пре
 
 | Тип | Значение |
 |---|---|
-| `PixelRuntime` | Объект с `calculate_funnel_score(journey, propertiesJson): string` |
+| `TelemetrySettings` | Настройка `conversion.scorePrefix` |
+| `PixelRuntime` | Объект с `calculate_funnel_score(journey, propertiesJson, scorePrefix): string` |
 | `RuntimeLoader` | `() => Promise<PixelRuntime>` |
 | `ConversionProperty` | Кортеж `[name: string, value: string]` |
-| `ConversionPayload` | Ответ Rust: `profile`, `pulse`, `score`, `properties` |
+| `ConversionPayload` | Ответ Rust: `profile`, `clickId`, `pulse`, `score`, `properties` |
 
 `ConversionPayload` описывает ожидаемую форму, а runtime-проверки в `conversion.ts` доказывают её фактически.
 
 ## 8. Настройки — `src/settings.ts`
 
-Централизует пять названий заголовков и `COUNTER_CLIENT = 'v2.10.4-pixel'`. При переименовании заголовка нужно менять не только эту константу, но и серверную проверку, CORS allowlist и тесты.
+Централизует шесть названий заголовков, `DEFAULT_SCORE_PREFIX = "00"` и `COUNTER_CLIENT = 'v2.10.4-pixel'`. При переименовании заголовка нужно менять не только эту константу, но и серверную проверку, CORS allowlist и тесты.
 
 ## 9. Generated base64 — `src/generated-pixel.ts`
 
@@ -210,7 +214,7 @@ export const PIXEL_BASE64: string = '...';
 
 1. Очищает только указанный generated output.
 2. Запускает TypeScript `--emitDeclarationOnly`.
-3. Использует esbuild: browser ESM, ES2022, bundle, minify, no legal comments, no source maps. Angular и RxJS остаются external peer dependencies.
+3. Использует esbuild: browser ESM, ES2020, bundle, minify, no legal comments, no source maps. Angular и RxJS остаются external peer dependencies.
 4. В lazy включает splitting и `chunkNames=pixel-[hash]`.
 5. Проверяет JS/declarations через artifact rules.
 
@@ -229,7 +233,7 @@ export const PIXEL_BASE64: string = '...';
 ### `scripts/artifact-rules.mjs`
 
 - `withoutEmbeddedPayload()` исключает длинные base64-литералы перед текстовым сканированием.
-- `assertNeutralArtifact()` запрещает comments, `sourceMappingURL` и термины `security`, `protection`, `secret`, `token`, `attack`, `bot`, `signature`, `authentication`, `authorization` без учёта регистра, включая вхождения в camelCase. Единственное узкое исключение — framework identifier `InjectionToken`; обычные имена `authToken` по-прежнему запрещены.
+- `assertNeutralArtifact()` запрещает comments, `sourceMappingURL` и термины `security`, `protection`, `secret`, `token`, `attack`, `bot`, `signature`, `authentication`, `authorization`, `nonce`, `challenge`, `proofOfWork`, `mining`, `getRandomValues` без учёта регистра, включая вхождения в camelCase. Единственное узкое исключение — framework identifier `InjectionToken`; обычные имена `authToken` по-прежнему запрещены.
 
 ## 11. Связанные тесты
 
@@ -238,7 +242,7 @@ export const PIXEL_BASE64: string = '...';
 | `tests/angular-interceptor.test.ts` | Все методы, pathname, полный набор headers, generation fail-open и отсутствие downstream retry |
 | `tests/conversion.test.ts` | Аргументы, пустые свойства, concurrent initialization, отклонение malformed payload |
 | `tests/runtime.test.ts` | Lazy start, shared Promise, retry после ошибки |
-| `tests/pixel.integration.test.ts` | Реальный WASM, golden headers, determinism, отсутствие `fetch` |
+| `tests/pixel.integration.test.ts` | Реальный WASM, cv2 golden headers, последовательность clickId, отсутствие `fetch` |
 | `tests/package-contents.test.ts` | Минимизированный embedded package contract |
 | `tests/release.test.ts` | Два архива, единственный payload, scanner, sizes, одинаковые golden headers обоих вариантов |
 

@@ -13,7 +13,7 @@ test('real Wasm produces deterministic cv2 headers from the browser sequence', a
   const originalNow = Date.now;
   const originalRandom = Math.random;
   const originalFetch = globalThis.fetch;
-  const performanceDescriptor = Object.getOwnPropertyDescriptor(globalThis.performance, 'now');
+  const originalPerformanceNow = globalThis.performance.now;
 
   try {
     Date.now = () => missing.now * 1000;
@@ -46,8 +46,9 @@ test('real Wasm produces deterministic cv2 headers from the browser sequence', a
     Date.now = originalNow;
     Math.random = originalRandom;
     globalThis.fetch = originalFetch;
-    if (performanceDescriptor) {
-      Object.defineProperty(globalThis.performance, 'now', performanceDescriptor);
-    }
+    Object.defineProperty(globalThis.performance, 'now', {
+      configurable: true,
+      value: originalPerformanceNow,
+    });
   }
 });

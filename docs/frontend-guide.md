@@ -6,7 +6,7 @@
 
 ## 1. Быстрый старт
 
-Все команды выполняются из корня репозитория:
+Все команды выполняются из корня репозитория под Node.js 18; demo и пакет проверяются на Angular 16.2 / TypeScript 5.1:
 
 ```bash
 npm install       # Только если зависимости ещё не установлены.
@@ -29,7 +29,7 @@ npm run build
 ```text
 hash-security/
 ├── apps/
-│   └── demo-web/                         # Angular 21 demo
+│   └── demo-web/                         # Angular 16 demo + Zone.js
 │       ├── angular.json                  # production/staging/development сборки
 │       ├── package.json                  # ng build, ng serve и frontend unit tests
 │       ├── proxy.conf.json               # Будущий /api proxy на PHP
@@ -63,6 +63,8 @@ hash-security/
 │       ├── Cargo.toml                    # Зависимости и release-профиль
 │       ├── src/
 │       │   ├── lib.rs                    # calculate_funnel_score и Date::now()
+│       │   ├── click.rs                  # ClickId, prefix и browser seed
+│       │   ├── sampling.rs               # Повторное использование prefix frame
 │       │   ├── journey.rs                # API-путь и контекст вычисления
 │       │   ├── touchpoint.rs             # DOM и fallback
 │       │   ├── pulse.rs                  # Обратимый Unix timestamp
@@ -73,9 +75,10 @@ hash-security/
 │       └── tests/                        # Rust fixture/property tests
 │
 ├── contracts/
-│   └── conversion-v1.md                  # Нормативный алгоритм cv1
+│   ├── conversion-v1.md                  # Сохранённый исходный алгоритм
+│   └── conversion-v2.md                  # Активный алгоритм с clickId
 ├── tests/
-│   └── fixtures/conversion-v1.json       # Независимые ожидаемые значения
+│   └── fixtures/conversion-v*.json       # Независимые ожидаемые значения
 ├── scripts/
 │   ├── build-wasm.mjs                    # Сборка Wasm и base64 TypeScript
 │   ├── check-browser.mjs                 # Production browser/CDP tests
@@ -92,7 +95,7 @@ hash-security/
 - `crates/funnel-wasm/src/**`
 - `packages/marketing-telemetry/src/*.ts`, кроме `generated-pixel.ts`
 - `apps/demo-web/src/**`
-- `contracts/conversion-v1.md`
+- `contracts/conversion-v1.md` и `contracts/conversion-v2.md`
 - тесты и fixtures при изменении протокола.
 
 ### Не редактировать вручную
@@ -142,7 +145,7 @@ export const PIXEL_BASE64 = 'AGFzbQEAAAAB...';
 Браузерный экспорт находится в `crates/funnel-wasm/src/lib.rs`:
 
 ```rust
-calculate_funnel_score(journey, properties_json)
+calculate_funnel_score(journey, properties_json, score_prefix)
 ```
 
 Он самостоятельно:
@@ -151,8 +154,9 @@ calculate_funnel_score(journey, properties_json)
 - вычисляет точный Unix timestamp текущей секунды;
 - ищет `span.telemetrics_click` и читает `data-tag`;
 - подставляет fallback при missing/empty/duplicate DOM;
-- выполняет `stages_v1()`;
-- возвращает JSON с `profile`, `pulse`, `score` и `properties`.
+- формирует начальный `clickId` без cryptographic API;
+- выполняет `sample_v2()` с настроенным `scorePrefix`;
+- возвращает JSON с `profile`, `clickId`, `pulse`, `score` и `properties`.
 
 ## 5. Как собрать NPM-пакет
 
@@ -269,7 +273,7 @@ npm run test:browser
 Проверяются:
 
 - production Angular и настоящий embedded Wasm;
-- точные `pulse` и `score` из golden fixtures;
+- точные `clickId`, `pulse` и `score` из cv2 golden fixtures;
 - отсутствие сетевого запроса `pixel.wasm`;
 - valid/missing/empty/duplicate DOM;
 - login/register и свойства всех пяти запросов;

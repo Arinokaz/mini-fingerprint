@@ -76,12 +76,14 @@ const initialScriptPaths = new Set(
   [...indexDocument.matchAll(/(?:src|href)=["']([^"']+\.js)["']/g)]
     .map((match) => new URL(match[1], 'http://localhost/').pathname),
 );
-const fixtureDocument = JSON.parse(await readFile(resolve(root, 'tests/fixtures/conversion-v1.json'), 'utf8'));
+const fixtureDocument = JSON.parse(await readFile(resolve(root, 'tests/fixtures/conversion-v2.json'), 'utf8'));
 const fixtureByName = new Map(fixtureDocument.cases.map((testCase) => [testCase.name, testCase]));
 const validLogin = fixtureByName.get('login-production-valid');
 const missingLogin = fixtureByName.get('login-production-missing');
+const emptyLogin = fixtureByName.get('login-production-empty');
+const duplicateLogin = fixtureByName.get('login-production-duplicate');
 const validRegister = fixtureByName.get('register-production-valid');
-assert.ok(validLogin && missingLogin && validRegister, 'Production golden fixtures are required.');
+assert.ok(validLogin && missingLogin && emptyLogin && duplicateLogin && validRegister, 'Production cv2 golden fixtures are required.');
 await mkdir(profileDirectory, { recursive: true });
 
 /** Uses the native temporary filesystem so Chromium locking works on WSL too. */
@@ -261,7 +263,11 @@ try {
   await devtools.send('Runtime.enable');
   await devtools.send('Network.enable');
   await devtools.send('Page.addScriptToEvaluateOnNewDocument', {
-    source: `Date.now = () => ${validLogin.now * 1000};`,
+    source: `
+      Date.now = () => ${validLogin.now * 1000};
+      Math.random = () => 0;
+      Object.defineProperty(window.performance, 'now', { configurable: true, value: () => 0 });
+    `,
   });
   console.log(`Browser check: navigating to ${applicationUrl}`);
   await devtools.send('Page.navigate', { url: applicationUrl });
@@ -288,6 +294,15 @@ try {
       [],
     );
   };
+  const assertConversion = (headers, testCase) => {
+    assert.equal(headers['x-ga-measurement-id'], 'cv2');
+    assert.equal(headers['x-ga-session-id'], testCase.pulse);
+    assert.equal(headers['x-amplitude-device-id'], testCase.score);
+    assert.equal(headers['x-amplitude-event-id'], testCase.clickId);
+    assert.equal(headers['x-ym-counter-client'], 'v2.10.4-pixel');
+    assert.ok(headers['x-amplitude-device-id'].startsWith(testCase.scorePrefix));
+    assertProperties(headers);
+  };
   const click = async (index, expectedRequests) => {
     console.log(`Browser check: click button ${index}, expecting request ${expectedRequests}.`);
     await devtools.evaluate(`document.querySelectorAll('button')[${index}].click()`);
@@ -313,23 +328,17 @@ try {
     assert.equal(deferredScriptRequests().length, 1, 'lazy chunk must load on the first submission');
   }
   const validHeaders = headersOf(requests[0]);
-  assert.equal(validHeaders['x-ga-measurement-id'], 'cv1');
-  assert.equal(validHeaders['x-ga-session-id'], validLogin.pulse);
-  assert.equal(validHeaders['x-amplitude-device-id'], validLogin.score);
-  assert.equal(validHeaders['x-ym-counter-client'], 'v2.10.4-pixel');
-  assertProperties(validHeaders);
+  assertConversion(validHeaders, validLogin);
   assert.ok(!Object.keys(validHeaders).includes('x-client-timestamp'));
 
   // Removing the only marker must still produce a request with a different score.
   await devtools.evaluate("document.querySelector('span.telemetrics_click').remove()");
   await click(0, 2);
   const missingHeaders = headersOf(requests[1]);
-  assert.equal(missingHeaders['x-ga-session-id'], missingLogin.pulse);
-  assert.equal(missingHeaders['x-amplitude-device-id'], missingLogin.score);
+  assertConversion(missingHeaders, missingLogin);
   assert.notEqual(missingHeaders['x-amplitude-device-id'], validHeaders['x-amplitude-device-id']);
-  assertProperties(missingHeaders);
 
-  // Empty and duplicate markers resolve to the same fallback and deterministic score.
+  // Empty and duplicate markers use the same fallback but distinct click sequences.
   await devtools.evaluate(`(() => {
     const span = document.createElement('span');
     span.className = 'telemetrics_click';
@@ -337,8 +346,7 @@ try {
     document.querySelector('app-root').appendChild(span);
   })()`);
   await click(0, 3);
-  assert.equal(headersOf(requests[2])['x-amplitude-device-id'], missingLogin.score);
-  assertProperties(headersOf(requests[2]));
+  assertConversion(headersOf(requests[2]), emptyLogin);
 
   await devtools.evaluate(`(() => {
     const second = document.createElement('span');
@@ -347,8 +355,7 @@ try {
     document.querySelector('app-root').appendChild(second);
   })()`);
   await click(0, 4);
-  assert.equal(headersOf(requests[3])['x-amplitude-device-id'], missingLogin.score);
-  assertProperties(headersOf(requests[3]));
+  assertConversion(headersOf(requests[3]), duplicateLogin);
 
   await devtools.evaluate(`(() => {
     document.querySelectorAll('span.telemetrics_click').forEach((element) => element.remove());
@@ -359,9 +366,7 @@ try {
   })()`);
   await click(1, 5);
   const registerHeaders = headersOf(requests[4]);
-  assert.equal(registerHeaders['x-ga-session-id'], validRegister.pulse);
-  assert.equal(registerHeaders['x-amplitude-device-id'], validRegister.score);
-  assertProperties(registerHeaders);
+  assertConversion(registerHeaders, validRegister);
   const wasmRequests = networkUrls.filter((url) => new URL(url).pathname.endsWith('.wasm'));
   console.log(`Browser check: validating ${packageVariant} package network behavior.`);
   assert.deepEqual(wasmRequests, [], `Unexpected Wasm requests: ${wasmRequests.join(', ')}`);

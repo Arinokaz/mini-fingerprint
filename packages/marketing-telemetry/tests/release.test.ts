@@ -34,13 +34,24 @@ before(() => {
 });
 
 test('artifact scanner ignores payload accidents but rejects revealing code', () => {
-  const payload = `${'A'.repeat(600)}token`;
+  const payload = `${'A'.repeat(600)}tokennoncechallengeproofOfWorkmininggetRandomValues`;
   assert.doesNotThrow(() => assertNeutralArtifact(`const payload="${payload}";`, 'payload.js'));
   assert.doesNotThrow(() => assertNeutralArtifact(
     "import { InjectionToken } from '@angular/core';",
     'angular.d.ts',
   ));
-  for (const revealing of ['const security = true;', 'const clientSecret = 1;', 'const authToken = 1;', 'authorizationHeader();', 'securityFlag = false;']) {
+  for (const revealing of [
+    'const security = true;',
+    'const clientSecret = 1;',
+    'const authToken = 1;',
+    'authorizationHeader();',
+    'securityFlag = false;',
+    'const nonce = 1;',
+    'challenge();',
+    'proofOfWork();',
+    'mining();',
+    'getRandomValues();',
+  ]) {
     assert.throws(
       () => assertNeutralArtifact(revealing, 'revealing.js'),
       /sensitive implementation terminology/,
@@ -102,16 +113,21 @@ test('size report measures raw Wasm, base64 and every variant file', () => {
   }
 });
 
-test('both built variants reproduce the same golden headers and initialize on demand', async () => {
-  const fixture = JSON.parse(readFileSync(resolve(packageRoot, '../../tests/fixtures/conversion-v1.json'), 'utf8'));
-  const testCase = fixture.cases.find((candidate: { name: string }) => candidate.name === 'login-missing-anchor');
+test('both built variants reproduce deterministic cv2 sequences and initialize on demand', async () => {
+  const fixture = JSON.parse(readFileSync(resolve(packageRoot, '../../tests/fixtures/conversion-v2.json'), 'utf8'));
+  const firstCase = fixture.cases.find((candidate: { name: string }) => candidate.name === 'login-production-missing');
+  const secondCase = fixture.cases.find((candidate: { name: string }) => candidate.name === 'login-production-empty');
   const originalNow = Date.now;
+  const originalRandom = Math.random;
   const originalFetch = globalThis.fetch;
   const originalAtob = globalThis.atob;
+  const originalPerformanceNow = globalThis.performance.now;
   let decodes = 0;
   const results = [];
   try {
-    Date.now = () => testCase.now * 1000;
+    Date.now = () => firstCase.now * 1000;
+    Math.random = () => 0;
+    Object.defineProperty(globalThis.performance, 'now', { configurable: true, value: () => 0 });
     globalThis.fetch = async () => {
       throw new Error('Built packages must not fetch a Wasm asset');
     };
@@ -124,22 +140,48 @@ test('both built variants reproduce the same golden headers and initialize on de
       const { TelemetrySdk } = await import(pathToFileURL(entry).href);
       assert.equal(decodes, 0, `${variant}: import must not initialize the runtime`);
       const sdk = new TelemetrySdk();
+      await sdk.getConversionHeaders(firstCase.journey, {});
       const [first, second] = await Promise.all([
-        sdk.getConversionHeaders(testCase.journey, Object.fromEntries(testCase.inputProperties)),
-        sdk.getConversionHeaders(testCase.journey, Object.fromEntries(testCase.inputProperties)),
+        sdk.getConversionHeaders(firstCase.journey, {}),
+        sdk.getConversionHeaders(secondCase.journey, {}),
       ]);
-      assert.deepEqual(first, second);
-      assert.equal(first['X-GA-Measurement-Id'], 'cv1');
-      assert.equal(first['X-GA-Session-Id'], testCase.pulse);
-      assert.equal(first['X-Amplitude-Device-Id'], testCase.score);
+      assert.equal(first['X-GA-Measurement-Id'], 'cv2');
+      assert.equal(first['X-Amplitude-Event-Id'], firstCase.clickId);
+      assert.equal(first['X-GA-Session-Id'], firstCase.pulse);
+      assert.equal(first['X-Amplitude-Device-Id'], firstCase.score);
+      assert.equal(second['X-Amplitude-Event-Id'], secondCase.clickId);
+      assert.equal(second['X-Amplitude-Device-Id'], secondCase.score);
+      assert.notEqual(second['X-Amplitude-Event-Id'], first['X-Amplitude-Event-Id']);
       assert.equal(decodes, 1, `${variant}: concurrent calls must share initialization`);
-      results.push(first);
+      results.push([first, second]);
       decodes = 0;
     }
     assert.deepEqual(results[0], results[1]);
   } finally {
     Date.now = originalNow;
+    Math.random = originalRandom;
     globalThis.fetch = originalFetch;
     globalThis.atob = originalAtob;
+    Object.defineProperty(globalThis.performance, 'now', {
+      configurable: true,
+      value: originalPerformanceNow,
+    });
   }
+});
+
+test('default cv2 sampling reports an observed timing baseline', async () => {
+  const entry = resolve(releaseRoot, 'staging', 'embedded', 'dist/index.js');
+  const { TelemetrySdk } = await import(pathToFileURL(entry).href);
+  const sdk = new TelemetrySdk();
+  const durations = [];
+  for (let index = 0; index < 201; index += 1) {
+    const started = performance.now();
+    const headers = await sdk.getConversionHeaders('/api/auth/login');
+    durations.push(performance.now() - started);
+    assert.ok(headers['X-Amplitude-Device-Id'].startsWith('00'));
+  }
+  durations.sort((left, right) => left - right);
+  console.log(
+    `cv2 default 00 timing: median=${durations[100].toFixed(3)}ms; p95=${durations[190].toFixed(3)}ms; samples=201`,
+  );
 });

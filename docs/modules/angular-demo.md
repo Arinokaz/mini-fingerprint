@@ -1,13 +1,12 @@
 # Angular demo
 
-Демонстрационное приложение находится в `apps/demo-web`. Оно проверяет реальную интеграцию Angular `HttpClient`, npm interceptor и Rust/WASM. Это не готовая форма авторизации и не backend.
+Демонстрационное приложение находится в `apps/demo-web` и использует Angular 16.2 с Zone.js. Оно проверяет реальную интеграцию Angular `HttpClient`, npm interceptor и Rust/WASM. Это не готовая форма авторизации и не backend.
 
 ## 1. Bootstrap — `src/main.ts`
 
 ```typescript
 bootstrapApplication(App, {
   providers: [
-    provideZonelessChangeDetection(),
     provideHttpClient(withInterceptors([marketingTelemetryInterceptor])),
   ],
 });
@@ -56,7 +55,7 @@ HTTP-ответ с ненулевым status превращается в generic
 1. Извлекает pathname без origin/query/fragment.
 2. Получает один root `TelemetrySdk` через `InjectionToken`.
 3. Вызывает `getConversionHeaders(path, {})` заново.
-4. При успехе клонирует request с пятью заголовками.
+4. При успехе клонирует request с шестью заголовками.
 5. При ошибке генерации отправляет исходный request без telemetry-заголовков.
 6. Передаёт downstream HTTP-ошибку приложению без повторной отправки.
 

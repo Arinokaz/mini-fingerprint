@@ -1,6 +1,6 @@
 # PHP 8.4 mirror — псевдокод для будущей реализации
 
-PHP-реализация временно отложена. Этот документ не является готовым кодом и не подключается к проекту. Нормативный источник операций: `contracts/conversion-v1.md`. Общие ожидаемые значения: `tests/fixtures/conversion-v1.json`.
+PHP-реализация временно отложена. Этот документ не является готовым кодом и не подключается к проекту. Активный frontend использует `cv2`: общие операции наследуются от `contracts/conversion-v1.md`, а clickId/scorePrefix определены в `contracts/conversion-v2.md`. Ожидаемые значения находятся в fixtures обеих версий.
 
 ## 1. Предлагаемые компоненты
 
@@ -8,6 +8,7 @@ PHP-реализация временно отложена. Этот докум�
 UInt32                 Только 32-битная арифметика без float и GMP.
 PropertyCodec          Проверка, сортировка и канонизация свойств.
 PulseCodec             Обратимое кодирование/декодирование времени.
+ClickCodec             Строгие 32 hex ↔ 16 байт clickId и prefix check.
 JourneyContext         Проверенные входные данные одного вычисления.
 FunnelStageInterface   Общий интерфейс четырёх рабочих стадий.
 FrameReducer           Порядок стадий и сериализация кадра.
@@ -148,6 +149,10 @@ PropertiesStage:
     payload = PropertyCodec.canonicalBytes(context.properties)
     return absorb(frame, 0xd9, payload, rounds=4)
 
+ClickStage:
+    // Только cv2: ровно 16 байт из полученного clickId.
+    return absorb(frame, 0xc1, context.clickIdBytes, rounds=4)
+
 PulseStage:
     payload = littleEndian32(out0) + littleEndian32(out1) + littleEndian64(timestamp)
     return absorb(frame, 0xe3, payload, rounds=8)
@@ -187,11 +192,14 @@ function diffuse(frame, rounds):
 ## 6. ConversionCheckpoint
 
 ```pseudo
-function matches(profile, journey, pulse, score, propertiesJson, serverTime) -> bool:
+function matches(profile, journey, clickId, pulse, score, propertiesJson, serverTime, scorePrefix) -> bool:
     try:
-        require profile == "cv1"
+        require profile == "cv2"
         require journey is valid absolute API path of <= 512 bytes
+        require clickId matches /^[0-9a-f]{32}$/
         require score matches /^[0-9a-f]{64}$/
+        require scorePrefix in ["", "0", "00", "000"]
+        require score startsWith scorePrefix
         [timestamp, parts] = PulseCodec.parseAndCheck(pulse, serverTime)
         properties = PropertyCodec.parse(propertiesJson)
         require PropertyCodec.canonicalJson(properties) == propertiesJson
@@ -200,6 +208,7 @@ function matches(profile, journey, pulse, score, propertiesJson, serverTime) -> 
             journey = actualServerRoute,       // Не путь из тела запроса.
             expectedServerTag = env TELEMETRY_TAG,
             properties = properties,
+            clickIdBytes = ClickCodec.decode(clickId),
             timestamp = timestamp,
             pulseParts = parts
         )
@@ -207,7 +216,7 @@ function matches(profile, journey, pulse, score, propertiesJson, serverTime) -> 
 
         frame = INITIAL
         frames = empty map
-        for stage in [JourneyStage, TouchpointStage, PropertiesStage, PulseStage]:
+        for stage in [JourneyStage, TouchpointStage, PropertiesStage, ClickStage, PulseStage]:
             frame = stage.apply(frame, context)
             frames[stage.name] = frame       // Для fixture-тестов.
 
@@ -225,7 +234,7 @@ HTTP-слой позднее будет только читать заголов
 2. Все `pulse` декодируются и повторно кодируются без изменений.
 3. Канонический JSON и бинарные свойства совпадают с fixtures, включая UTF-8.
 4. Fallback-fixtures не проходят с ожидаемым настоящим `TELEMETRY_TAG`.
-5. Изменение пути, свойства, тега, времени или одного hex-символа даёт `false`.
+5. Изменение пути, свойства, тега, clickId, времени или одного hex-символа даёт `false`; score без настроенного prefix также отклоняется.
 6. Некорректные hex, JSON, base64url, дубли и превышение лимитов дают `false` без warnings.
 7. Timestamp ровно на границах past=30/future=5 принимается; более старый и более далёкий будущий отклоняются.
 8. Differential-тест на одинаковых случайных входах сравнивает Rust и PHP после каждой стадии.

@@ -32,7 +32,7 @@
 
 Для сборки этого репозитория требуются:
 
-- Node.js `^22.12.0 || >=24.0.0` и npm;
+- Node.js `^18.10.0` и npm;
 - Rust stable, установленный через `rustup`;
 - компиляционный target `wasm32-unknown-unknown`;
 - `wasm-pack`, доступный в `PATH`.
@@ -258,7 +258,11 @@ Angular может переименовать `pixel.<hash>.js` в собств�
 - `base64Bytes` — размер base64-представления;
 - `variants.embedded.files` и `variants.lazy.files` — размер каждого JS и его gzip-размер.
 
-Base64 увеличивает бинарные данные примерно на треть. Сравнивайте фактические значения из отчёта после каждого изменения алгоритма. Произвольный лимит пока не установлен: сначала нужен измеренный baseline конкретного приложения.
+Base64 увеличивает бинарные данные примерно на треть. Сравнивайте фактические значения из отчёта после каждого изменения алгоритма.
+
+Baseline текущей `cv2`-сборки: raw Wasm 87 173 байта, base64 116 232 байта; embedded `index.js` — 124 656 байт / 57 056 gzip, lazy facade — 2 472 байта / 1 235 gzip, lazy runtime — 121 859 байт / 55 527 gzip. Это размеры конкретной сборки, а не лимиты.
+
+Release-проверка реального Wasm на Node.js 18 для default `"00"` зафиксировала за 201 вызов: median 0,204 ms и p95 0,819 ms. Это наблюдение на текущей машине, а не обещание для браузеров и слабых устройств. Не повышайте prefix без отдельного измерения median/p95 на целевых клиентах.
 
 ### 5.3. Проверка содержимого и поведения
 
@@ -287,7 +291,7 @@ npm run test:package:angular
 
 ## 6. Подключение к любому Angular-проекту
 
-Пакет является Angular-only и использует `@angular/common`, `@angular/core` и `rxjs` через `peerDependencies`. Подходят современные Angular-проекты с ESM bundler и поддержкой browser WebAssembly. Очень старые Angular/toolchain-версии без поддержки ES2022 могут потребовать обновления; это ограничение потребителя, а не дополнительный шаг настройки WASM.
+Пакет является Angular-only и использует `@angular/common`, `@angular/core` и `rxjs` через `peerDependencies`. Текущий baseline — Angular 16.2, TypeScript 5.1, Node.js 18 для сборки и ES2020 для пакета. Поддерживаются ESM bundler и browser WebAssembly; более новые Angular-версии не заявляются без отдельной consumer-проверки.
 
 ### 6.1. Вариант A: установка готового `.tgz` — рекомендуется
 
@@ -416,19 +420,34 @@ provideHttpClient(withInterceptors([
 return this.http.post("/api/auth/login", { email, password });
 ```
 
-Interceptor обрабатывает все `HttpClient`-запросы, передаёт в WASM только pathname и вызывает `getConversionHeaders(path, {})` заново для каждого запроса. Пять заголовков добавляются целиком. Специальные `form=login/register` больше не используются.
+Interceptor обрабатывает все `HttpClient`-запросы, передаёт в WASM pathname и настроенный `scorePrefix` и вызывает `getConversionHeaders(path, {})` заново для каждого запроса. Шесть заголовков добавляются целиком. Специальные `form=login/register` больше не используются.
 
-`@angular/common`, `@angular/core` и `rxjs` объявлены как `peerDependencies`: пакет использует копии этих библиотек из приложения и не встраивает второй Angular в bundle. Текущий manifest требует Angular `>=17` и RxJS `^7.8.0`; фактически сборка проверена на Angular 21. Перед интеграцией в боевое приложение необходимо подтвердить его версии Angular/RxJS и при необходимости отдельно проверить более старый toolchain.
+`@angular/common`, `@angular/core` и `rxjs` объявлены как `peerDependencies`: пакет использует копии этих библиотек из приложения и не встраивает второй Angular в bundle. Текущий manifest требует Angular `>=16 <17` и RxJS `^7.8.0`; production, browser и isolated `.tgz` сборки проверены на Angular 16.2 / TypeScript 5.1.
 
 Пакет не выполняет retry. Если инициализация или вычисление WASM завершились ошибкой, interceptor один раз отправляет исходный запрос без telemetry-заголовков; backend определяет дальнейшую политику. HTTP-ошибка backend не перехватывается как ошибка генерации и не вызывает повторную отправку.
 
 Прямые вызовы нативного `fetch` и XHR вне `HttpClient` interceptor не обрабатывает.
 
+По умолчанию `scorePrefix = "00"`: Wasm в среднем выполняет 256 попыток до подходящего score. Допустимы `""`, `"0"`, `"00"` и `"000"`. В Angular настройка передаётся через providers:
+
+```typescript
+import { TELEMETRY_SETTINGS } from '@company/marketing-telemetry';
+
+providers: [
+  {
+    provide: TELEMETRY_SETTINGS,
+    useValue: { conversion: { scorePrefix: '00' } },
+  },
+]
+```
+
+При ручном создании используется `new TelemetrySdk({ conversion: { scorePrefix: '00' } })`. Backend должен применять собственную согласованную настройку, а не доверять клиентскому выбору.
+
 ### 7.3. Timestamp и ручной API
 
 Для нестандартной интеграции остаётся доступен `TelemetrySdk.getConversionHeaders(actionPath, properties)`. Обычному Angular-приложению ручной вызов не нужен.
 
-WASM сам получает `floor(Date.now() / 1000)`. Временные окна удалены: `pulse` кодирует точный timestamp, поэтому одинаковые входы в одну секунду дают одинаковый результат, а на следующей секунде результат меняется. Backend должен проверять возраст timestamp; рекомендуемые начальные допуски — 30 секунд в прошлое и 5 секунд в будущее.
+WASM сам получает `floor(Date.now() / 1000)` и фиксирует timestamp на время перебора. `pulse` кодирует точный timestamp, а `clickId` делает последовательности вызовов различимыми. Без server-side single-use учёта clickId валидный набор можно повторно использовать в допустимом интервале. Backend должен проверять возраст timestamp; рекомендуемые начальные допуски — 30 секунд в прошлое и 5 секунд в будущее.
 
 ### 7.4. Если API находится на другом origin
 
@@ -438,6 +457,7 @@ WASM сам получает `floor(Date.now() / 1000)`. Временные ок
 X-GA-Measurement-Id
 X-GA-Session-Id
 X-Amplitude-Device-Id
+X-Amplitude-Event-Id
 X-Amplitude-Session-Properties
 X-YM-Counter-Client
 ```

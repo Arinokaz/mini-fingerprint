@@ -10,7 +10,7 @@
 | `TelemetrySdk` | Проверка ответа WASM и формирование заголовков | [`modules/telemetry-package.md`](modules/telemetry-package.md) |
 | `RuntimeGate` | Однократная инициализация и разделение concurrent-вызовов | [`modules/telemetry-package.md`](modules/telemetry-package.md) |
 | `pixel-runtime.ts` | Base64 decode и инициализация WebAssembly из bytes | [`modules/telemetry-package.md`](modules/telemetry-package.md) |
-| Rust `funnel-wasm` | Время, DOM, канонизация свойств и вычисления `cv1` | [`modules/rust-wasm.md`](modules/rust-wasm.md) |
+| Rust `funnel-wasm` | Время, DOM, канонизация свойств, clickId и вычисления `cv2` | [`modules/rust-wasm.md`](modules/rust-wasm.md) |
 | HTTP API | Получает JSON и telemetry-заголовки | Backend mirror пока отложен |
 
 ## 2. Полный путь login/register
@@ -38,13 +38,15 @@ pixel-runtime.ts
   • декодирует PIXEL_BASE64 и передаёт bytes в wasm-bindgen
         │
         ▼
-Rust calculate_funnel_score(journey, "[]")
+Rust calculate_funnel_score(journey, "[]", scorePrefix)
   • получает точный Unix timestamp текущей секунды
   • читает span.telemetrics_click[data-tag]
-  • выполняет journey → touchpoint → properties → pulse
+  • формирует начальный clickId без cryptographic API
+  • выполняет journey → touchpoint → properties один раз
+  • перебирает click → pulse до совпадения scorePrefix
         │
         ▼
-TelemetrySdk проверяет JSON и возвращает пять заголовков
+TelemetrySdk проверяет JSON и возвращает шесть заголовков
         │
         ▼
 Interceptor клонирует request и один раз передаёт его downstream
@@ -54,13 +56,14 @@ Interceptor клонирует request и один раз передаёт ег�
 
 ## 3. Что возвращает npm-пакет
 
-`TelemetrySdk.getConversionHeaders()` возвращает `Promise<Record<string, string>>` с пятью заголовками:
+`TelemetrySdk.getConversionHeaders()` возвращает `Promise<Record<string, string>>` с шестью заголовками:
 
 | Заголовок | Содержимое |
 |---|---|
-| `X-GA-Measurement-Id` | Версия профиля, сейчас `cv1` |
+| `X-GA-Measurement-Id` | Версия профиля активного runtime, сейчас `cv2` |
 | `X-GA-Session-Id` | `pulse` — обратимое представление Unix timestamp в секундах |
-| `X-Amplitude-Device-Id` | `score` — 64 строчных hex-символа |
+| `X-Amplitude-Device-Id` | `score` — 64 строчных hex-символа с настроенным `scorePrefix` |
+| `X-Amplitude-Event-Id` | Финальный `clickId` — 32 строчных hex-символа |
 | `X-Amplitude-Session-Properties` | Канонический JSON свойств в base64url без padding |
 | `X-YM-Counter-Client` | Статическое telemetry-значение |
 
@@ -78,7 +81,11 @@ JSON-массив пар `[name, value]`, а не JSON-объект. TypeScript 
 
 ### Текущее время
 
-TypeScript не передаёт timestamp как аргумент. Rust сам получает `js_sys::Date::now()` и использует `floor(now / 1000)`. Одинаковые входы в одну секунду дают одинаковый результат; серверный допуск ограничивает срок повторного использования.
+TypeScript не передаёт timestamp как аргумент. Rust сам получает `js_sys::Date::now()` и использует `floor(now / 1000)`. Timestamp фиксируется на время перебора. `clickId` меняет результат между вызовами, но без будущего server-side single-use учёта не запрещает повторное использование валидного набора в пределах серверного допуска.
+
+### `clickId` и `scorePrefix`
+
+Начальный 128-битный `clickId` формируется из `Math.random()`, времени, `performance.now()` и счётчика вызовов без cryptographic API. По умолчанию `scorePrefix = "00"`: в среднем требуется 256 попыток. Поддерживаются `""`, `"0"`, `"00"` и `"000"`. Начальный префикс выбран как лёгкий режим; фактическая задержка зависит от устройства.
 
 ### DOM
 
