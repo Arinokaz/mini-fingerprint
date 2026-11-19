@@ -20,7 +20,10 @@
     "rxjs": "^7.8.0"
   },
   "scripts": {
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "test:release": "tsx --test tests/release.test.ts",
+    "build": "node scripts/build.mjs",
+    "build:release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "@angular/compiler": "^16.2.0",

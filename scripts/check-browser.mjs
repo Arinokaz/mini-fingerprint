@@ -16,6 +16,7 @@ const browserRoot = process.env['DEMO_BROWSER_ROOT']
   ? resolve(root, process.env['DEMO_BROWSER_ROOT'])
   : resolve(root, 'apps/demo-web/dist/demo-web/browser');
 const packageVariant = process.env['TELEMETRY_VARIANT'] ?? 'embedded';
+const productOnly = process.env['PRODUCT_ONLY'] === '1';
 console.log(`Browser check: requested variant=${packageVariant}; platform=${process.platform}.`);
 assert.ok(['embedded', 'lazy'].includes(packageVariant), `Unknown telemetry variant: ${packageVariant}`);
 const profileDirectory = resolve(tmpdir(), 'opencode', 'chrome-profile');
@@ -78,12 +79,20 @@ const initialScriptPaths = new Set(
 );
 const fixtureDocument = JSON.parse(await readFile(resolve(root, 'tests/fixtures/conversion-v2.json'), 'utf8'));
 const fixtureByName = new Map(fixtureDocument.cases.map((testCase) => [testCase.name, testCase]));
+const productFixtureDocument = JSON.parse(await readFile(resolve(root, 'tests/fixtures/product-analytics-v1.json'), 'utf8'));
+const productFixtureByName = new Map(productFixtureDocument.cases.map((testCase) => [testCase.name, testCase]));
 const validLogin = fixtureByName.get('login-production-valid');
 const missingLogin = fixtureByName.get('login-production-missing');
 const emptyLogin = fixtureByName.get('login-production-empty');
 const duplicateLogin = fixtureByName.get('login-production-duplicate');
 const validRegister = fixtureByName.get('register-production-valid');
+const productValidLogin = productFixtureByName.get('login-production-valid');
+const productMissingLogin = productFixtureByName.get('login-production-missing');
+const productEmptyLogin = productFixtureByName.get('login-production-empty');
+const productDuplicateLogin = productFixtureByName.get('login-production-duplicate');
+const productValidRegister = productFixtureByName.get('register-production-valid');
 assert.ok(validLogin && missingLogin && emptyLogin && duplicateLogin && validRegister, 'Production cv2 golden fixtures are required.');
+assert.ok(productValidLogin && productMissingLogin && productEmptyLogin && productDuplicateLogin && productValidRegister, 'Production pa1 golden fixtures are required.');
 await mkdir(profileDirectory, { recursive: true });
 
 /** Uses the native temporary filesystem so Chromium locking works on WSL too. */
@@ -267,6 +276,7 @@ try {
       Date.now = () => ${validLogin.now * 1000};
       Math.random = () => 0;
       Object.defineProperty(window.performance, 'now', { configurable: true, value: () => 0 });
+      ${productOnly ? "Object.defineProperty(window, 'WebAssembly', { configurable: true, value: undefined });" : ''}
     `,
   });
   console.log(`Browser check: navigating to ${applicationUrl}`);
@@ -303,6 +313,27 @@ try {
     assert.ok(headers['x-amplitude-device-id'].startsWith(testCase.scorePrefix));
     assertProperties(headers);
   };
+  const assertProduct = (headers, testCase) => {
+    assert.equal(headers['x-pa-measurement-id'], 'pa1');
+    assert.equal(headers['x-pa-session-id'], testCase.pulse);
+    assert.equal(headers['x-pa-device-id'], testCase.score);
+    assert.equal(headers['x-pa-event-id'], testCase.eventId);
+    assert.ok(headers['x-pa-session-properties'].length <= 1400);
+    const snapshot = JSON.parse(Buffer.from(headers['x-pa-session-properties'], 'base64url').toString('utf8'));
+    assert.equal(snapshot.viewId, testCase.viewId);
+    assert.equal(snapshot.features & 1, productOnly ? 0 : 1);
+    assert.ok(Array.isArray(snapshot.engagement) && snapshot.engagement.length === 4);
+  };
+  const assertRequest = (headers, conversionCase, productCase) => {
+    if (productOnly) {
+      for (const name of ['x-ga-measurement-id', 'x-ga-session-id', 'x-amplitude-device-id', 'x-amplitude-event-id', 'x-amplitude-session-properties', 'x-ym-counter-client']) {
+        assert.equal(headers[name], undefined, `${name} must be absent in product-only mode`);
+      }
+    } else {
+      assertConversion(headers, conversionCase);
+    }
+    assertProduct(headers, productCase);
+  };
   const click = async (index, expectedRequests) => {
     console.log(`Browser check: click button ${index}, expecting request ${expectedRequests}.`);
     await devtools.evaluate(`document.querySelectorAll('button')[${index}].click()`);
@@ -328,14 +359,14 @@ try {
     assert.equal(deferredScriptRequests().length, 1, 'lazy chunk must load on the first submission');
   }
   const validHeaders = headersOf(requests[0]);
-  assertConversion(validHeaders, validLogin);
+  assertRequest(validHeaders, validLogin, productValidLogin);
   assert.ok(!Object.keys(validHeaders).includes('x-client-timestamp'));
 
   // Removing the only marker must still produce a request with a different score.
-  await devtools.evaluate("document.querySelector('span.telemetrics_click').remove()");
+  await devtools.evaluate("document.querySelector('span.telemetrics_click')?.remove(); document.querySelector('canvas.analytics_stage')?.remove()");
   await click(0, 2);
   const missingHeaders = headersOf(requests[1]);
-  assertConversion(missingHeaders, missingLogin);
+  assertRequest(missingHeaders, missingLogin, productMissingLogin);
   assert.notEqual(missingHeaders['x-amplitude-device-id'], validHeaders['x-amplitude-device-id']);
 
   // Empty and duplicate markers use the same fallback but distinct click sequences.
@@ -344,9 +375,17 @@ try {
     span.className = 'telemetrics_click';
     span.dataset.tag = '';
     document.querySelector('app-root').appendChild(span);
+    const secondCanvas = document.createElement('canvas');
+    secondCanvas.className = 'analytics_stage';
+    secondCanvas.dataset.view = 'second-view';
+    document.querySelector('app-root').appendChild(secondCanvas);
+    const canvas = document.createElement('canvas');
+    canvas.className = 'analytics_stage';
+    canvas.dataset.view = '';
+    document.querySelector('app-root').appendChild(canvas);
   })()`);
   await click(0, 3);
-  assertConversion(headersOf(requests[2]), emptyLogin);
+  assertRequest(headersOf(requests[2]), emptyLogin, productEmptyLogin);
 
   await devtools.evaluate(`(() => {
     const second = document.createElement('span');
@@ -355,7 +394,7 @@ try {
     document.querySelector('app-root').appendChild(second);
   })()`);
   await click(0, 4);
-  assertConversion(headersOf(requests[3]), duplicateLogin);
+  assertRequest(headersOf(requests[3]), duplicateLogin, productDuplicateLogin);
 
   await devtools.evaluate(`(() => {
     document.querySelectorAll('span.telemetrics_click').forEach((element) => element.remove());
@@ -363,10 +402,15 @@ try {
     valid.className = 'telemetrics_click';
     valid.dataset.tag = 'production-build-tag';
     document.querySelector('app-root').appendChild(valid);
+    document.querySelectorAll('canvas.analytics_stage').forEach((element) => element.remove());
+    const validCanvas = document.createElement('canvas');
+    validCanvas.className = 'analytics_stage';
+    validCanvas.dataset.view = 'production-view-2026.11';
+    document.querySelector('app-root').appendChild(validCanvas);
   })()`);
   await click(1, 5);
   const registerHeaders = headersOf(requests[4]);
-  assertConversion(registerHeaders, validRegister);
+  assertRequest(registerHeaders, validRegister, productValidRegister);
   const wasmRequests = networkUrls.filter((url) => new URL(url).pathname.endsWith('.wasm'));
   console.log(`Browser check: validating ${packageVariant} package network behavior.`);
   assert.deepEqual(wasmRequests, [], `Unexpected Wasm requests: ${wasmRequests.join(', ')}`);

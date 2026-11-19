@@ -10,6 +10,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = resolve(tmpdir(), 'opencode');
 const manifest = JSON.parse(await readFile(resolve(root, 'packages/marketing-telemetry/package.json'), 'utf8'));
 const baseName = `company-marketing-telemetry-${manifest.version}`;
+const productArchive = resolve(root, 'release', 'company-product-analytics-0.1.0.tgz');
 await mkdir(temporaryRoot, { recursive: true });
 
 function run(command, args, options = {}) {
@@ -26,6 +27,7 @@ function run(command, args, options = {}) {
 for (const variant of ['embedded', 'lazy']) {
   const archive = resolve(root, 'release', `${baseName}-${variant}.tgz`);
   assert.ok(existsSync(archive), `Build the npm variants first: missing ${archive}`);
+  assert.ok(existsSync(productArchive), `Build product analytics first: missing ${productArchive}`);
   const temporary = await mkdtemp(resolve(temporaryRoot, `telemetry-${variant}-`));
   try {
     const demo = resolve(temporary, 'demo-web');
@@ -37,6 +39,7 @@ for (const variant of ['embedded', 'lazy']) {
     const demoManifestPath = resolve(demo, 'package.json');
     const demoManifest = JSON.parse(await readFile(demoManifestPath, 'utf8'));
     demoManifest.dependencies['@company/marketing-telemetry'] = archive;
+    demoManifest.dependencies['@company/product-analytics'] = productArchive;
     await writeFile(demoManifestPath, `${JSON.stringify(demoManifest, null, 2)}\n`);
 
     console.log(`Angular ${variant}: installing the actual archive in ${demo}`);

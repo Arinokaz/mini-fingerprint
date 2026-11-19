@@ -12,12 +12,17 @@ import {
 import type { TelemetrySdk } from '../src/conversion.js';
 
 const conversionHeaders = {
-  'X-GA-Measurement-Id': 'cv1',
+  'X-GA-Measurement-Id': 'cv2',
   'X-GA-Session-Id': '0011223344556677',
   'X-Amplitude-Device-Id': '0123456789abcdef'.repeat(4),
   'X-Amplitude-Event-Id': '0123456789abcdef'.repeat(2),
   'X-Amplitude-Session-Properties': 'W10',
   'X-YM-Counter-Client': 'v2.10.4-pixel',
+};
+
+const productHeaders = {
+  'X-PA-Measurement-Id': 'pa1',
+  'X-PA-Device-Id': '0123456789abcdef'.repeat(2),
 };
 
 interface ConversionCall {
@@ -142,6 +147,7 @@ test('generation failure strips stale telemetry headers and preserves unrelated 
   const request = new HttpRequest<unknown>('POST', '/api/auth/login', { email: 'a@b.test' }, {
     headers: new HttpHeaders({
       ...conversionHeaders,
+      ...productHeaders,
       'X-Request-Trace': 'keep-me',
     }),
   });
@@ -160,6 +166,8 @@ test('generation failure strips stale telemetry headers and preserves unrelated 
     assert.equal(outgoing?.headers.has(name), false, `${name} must be removed`);
   }
   assert.equal(outgoing?.headers.get('X-Request-Trace'), 'keep-me');
+  assert.equal(outgoing?.headers.get('X-PA-Measurement-Id'), 'pa1');
+  assert.equal(outgoing?.headers.get('X-PA-Device-Id'), productHeaders['X-PA-Device-Id']);
   assert.equal(outgoing?.url, request.url);
   assert.deepEqual(outgoing?.body, request.body);
 });

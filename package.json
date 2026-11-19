@@ -18,10 +18,10 @@
   "scripts": {
     "check:contract": "node scripts/check-contract.mjs",
     "build:wasm": "node scripts/build-wasm.mjs",
-    "build:npm": "npm run build:wasm && npm run build:release --workspace @company/marketing-telemetry",
+    "build:npm": "npm run build:wasm && npm run build:release --workspace @company/marketing-telemetry && npm run build:release --workspace @company/product-analytics",
     "test": "npm run check:contract && npm test --workspaces --if-present",
     "test:browser": "node scripts/check-browser.mjs",
     "test:package:angular": "node scripts/check-package-angular.mjs",
-    "build": "npm run build:wasm && npm run build --workspace @company/marketing-telemetry && npm run build --workspace demo-web"
+    "build": "npm run build:wasm && npm run build --workspace @company/marketing-telemetry && npm run build --workspace @company/product-analytics && npm run build --workspace demo-web"
   }
 }
