@@ -1,75 +1,64 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { TelemetrySdk } from '../src/conversion.js';
-import type { ConversionPayload } from '../src/types.js';
 
-/** Loads the already generated artifact; this test never downloads a tool. */
+/** Loads the generated artifact without a separate Wasm network request. */
 async function loadGeneratedPixel() {
   const wasmBytes = await readFile(new URL('../pkg/pixel.wasm', import.meta.url));
   const generated = await import('../pkg/funnel_wasm.js');
   await generated.default({ module_or_path: new Uint8Array(wasmBytes) });
-  return {
-    calculate_funnel_score: generated.calculate_funnel_score,
-  };
+  return { calculate_funnel_score: generated.calculate_funnel_score };
 }
 
-test('real Wasm reproduces the missing-DOM fixture and emits stable telemetry headers', async () => {
+test('real Wasm produces deterministic cv2 samples from the browser sequence', async () => {
   const fixture = JSON.parse(await readFile(
-    new URL('../../../tests/fixtures/conversion-v1.json', import.meta.url),
+    new URL('../../../tests/fixtures/conversion-v2.json', import.meta.url),
     'utf8',
   ));
-  const testCase = fixture.cases.find((candidate: { name: string }) => candidate.name === 'login-missing-anchor');
+  const missing = fixture.cases.find((candidate: { name: string }) => candidate.name === 'login-production-missing');
+  const next = fixture.cases.find((candidate: { name: string }) => candidate.name === 'login-production-empty');
   const originalNow = Date.now;
+  const originalRandom = Math.random;
   const originalFetch = globalThis.fetch;
+  const performanceDescriptor = Object.getOwnPropertyDescriptor(globalThis.performance, 'now');
 
   try {
-    Date.now = () => testCase.now * 1000;
+    Date.now = () => missing.now * 1000;
+    Math.random = () => 0;
+    Object.defineProperty(globalThis.performance, 'now', { configurable: true, value: () => 0 });
     globalThis.fetch = async () => {
       throw new Error('The embedded base64 runtime must not fetch a Wasm asset');
     };
-    const sdk = new TelemetrySdk();
-    const headers = await sdk.getConversionHeaders(
-      testCase.journey,
-      Object.fromEntries(testCase.inputProperties),
-    );
-
-    assert.equal(headers['X-GA-Measurement-Id'], 'cv1');
-    assert.equal(headers['X-GA-Session-Id'], testCase.pulse);
-    assert.equal(headers['X-Amplitude-Device-Id'], testCase.score);
-    assert.equal(
-      headers['X-Amplitude-Session-Properties'],
-      Buffer.from(testCase.canonicalPropertiesJson, 'utf8').toString('base64url'),
-    );
-    assert.equal(headers['X-YM-Counter-Client'], 'v2.10.4-pixel');
-
-    const second = await sdk.getConversionHeaders(
-      testCase.journey,
-      Object.fromEntries(testCase.inputProperties),
-    );
-    assert.deepEqual(second, headers, 'the same environment and time must be deterministic');
-
-    const otherPath = await sdk.getConversionHeaders(
-      '/api/auth/register',
-      Object.fromEntries(testCase.inputProperties),
-    );
-    assert.notEqual(otherPath['X-Amplitude-Device-Id'], headers['X-Amplitude-Device-Id']);
-
-    Date.now = () => (testCase.now + 1) * 1000;
-    const nextSecond = await sdk.getConversionHeaders(
-      testCase.journey,
-      Object.fromEntries(testCase.inputProperties),
-    );
-    assert.notEqual(nextSecond['X-GA-Session-Id'], headers['X-GA-Session-Id']);
-    assert.notEqual(nextSecond['X-Amplitude-Device-Id'], headers['X-Amplitude-Device-Id']);
-
-    Date.now = () => testCase.now * 1000;
     const raw = await loadGeneratedPixel();
-    const payload = JSON.parse(raw.calculate_funnel_score(testCase.journey, testCase.canonicalPropertiesJson)) as ConversionPayload;
-    assert.equal(payload.score, testCase.score);
-    assert.equal(payload.pulse, testCase.pulse);
+
+    // Prime the per-runtime call counter; the next two calls use fixtures 1 and 2.
+    raw.calculate_funnel_score(missing.journey, missing.canonicalPropertiesJson, missing.scorePrefix);
+    const first = JSON.parse(raw.calculate_funnel_score(
+      missing.journey,
+      missing.canonicalPropertiesJson,
+      missing.scorePrefix,
+    ));
+    const second = JSON.parse(raw.calculate_funnel_score(
+      next.journey,
+      next.canonicalPropertiesJson,
+      next.scorePrefix,
+    ));
+
+    assert.equal(first.profile, 'cv2');
+    assert.equal(first.clickId, missing.clickId);
+    assert.equal(first.pulse, missing.pulse);
+    assert.equal(first.score, missing.score);
+    assert.deepEqual(first.properties, []);
+    assert.equal(second.clickId, next.clickId);
+    assert.equal(second.score, next.score);
+    assert.equal(second.pulse, first.pulse);
+    assert.notEqual(second.clickId, first.clickId);
   } finally {
     Date.now = originalNow;
+    Math.random = originalRandom;
     globalThis.fetch = originalFetch;
+    if (performanceDescriptor) {
+      Object.defineProperty(globalThis.performance, 'now', performanceDescriptor);
+    }
   }
 });

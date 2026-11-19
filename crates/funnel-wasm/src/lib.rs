@@ -12,19 +12,21 @@ pub mod touchpoint;
 
 /// Выполняет текущее conversion-вычисление полностью внутри браузерного модуля.
 ///
-/// Фасад передаёт только API-путь и дополнительные свойства. Время и DOM
-/// получаются здесь, поэтому TypeScript не предоставляет доверенный timestamp.
+/// Фасад передаёт только API-путь, дополнительные свойства и настройку prefix.
+/// Время, DOM и начальный clickId получаются здесь, поэтому TypeScript не
+/// предоставляет доверенный timestamp или отправную точку перебора.
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn calculate_funnel_score(
     journey: &str,
     properties_json: &str,
+    score_prefix: &str,
 ) -> Result<String, wasm_bindgen::JsValue> {
+    use crate::click::next_browser_click_id;
     use crate::codec::CanonicalProperties;
-    use crate::frame::Frame;
     use crate::journey::JourneyContext;
     use crate::pulse::pulse_to_hex;
-    use crate::stages::stages_v1;
+    use crate::sampling::sample_v2;
     use crate::touchpoint::current_touchpoint;
     use serde_json::{json, Value};
     use wasm_bindgen::JsValue;
@@ -39,20 +41,17 @@ pub fn calculate_funnel_score(
     let now_seconds = (now_milliseconds / 1000.0) as u64;
     let context = JourneyContext::new(journey, &current_touchpoint(), properties, now_seconds)
         .map_err(|_| JsValue::from_str("unsupported conversion context"))?;
-
-    let mut frame = Frame::from_journey(context.journey())
-        .map_err(|_| JsValue::from_str("unsupported conversion journey"))?;
-    // Порядок стадий является частью контракта cv1 и не должен меняться независимо.
-    for stage in stages_v1() {
-        stage.apply(frame.lanes_mut(), &context);
-    }
+    let initial = next_browser_click_id(now_milliseconds);
+    let sample = sample_v2(&context, initial, score_prefix)
+        .map_err(|_| JsValue::from_str("unsupported conversion settings"))?;
 
     let property_value: Value = serde_json::from_str(&canonical_json)
         .map_err(|_| JsValue::from_str("conversion property encoding failed"))?;
     let result = json!({
-        "profile": "cv1",
+        "profile": "cv2",
+        "clickId": sample.click_id.to_hex(),
         "pulse": pulse_to_hex(context.pulse()),
-        "score": frame.to_hex(),
+        "score": sample.score,
         "properties": property_value,
     });
     Ok(result.to_string())

@@ -110,3 +110,34 @@ pub fn validate_score_prefix(value: &str) -> Result<(), ClickIdError> {
         "scorePrefix must contain between zero and three zero characters",
     ))
 }
+
+/// Формирует начальный идентификатор из обычных браузерных источников.
+#[cfg(target_arch = "wasm32")]
+pub fn next_browser_click_id(now_milliseconds: f64) -> ClickId {
+    use std::cell::Cell;
+    use web_sys::window;
+
+    thread_local! {
+        static CALL_COUNTER: Cell<u32> = const { Cell::new(0) };
+    }
+
+    let counter = CALL_COUNTER.with(|current| {
+        let value = current.get();
+        current.set(value.wrapping_add(1));
+        value
+    });
+    let random_word = || (js_sys::Math::random() * 4_294_967_296.0).floor() as u32;
+    let now = now_milliseconds.floor() as u64;
+    let performance_micros = window()
+        .and_then(|browser| browser.performance())
+        .map(|performance| performance.now() * 1000.0)
+        .unwrap_or(0.0)
+        .floor() as u64;
+
+    ClickId::from_words([
+        random_word() ^ now as u32,
+        random_word() ^ ((now >> 32) as u32),
+        random_word() ^ performance_micros as u32,
+        random_word() ^ counter,
+    ])
+}
