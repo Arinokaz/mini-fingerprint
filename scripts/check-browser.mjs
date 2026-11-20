@@ -299,28 +299,39 @@ try {
   const headersOf = (request) => Object.fromEntries(
     Object.entries(request.headers).map(([name, value]) => [name.toLowerCase(), value]),
   );
-  const assertProperties = (headers) => {
-    assert.deepEqual(
-      JSON.parse(Buffer.from(headers['x-amplitude-session-properties'], 'base64url').toString('utf8')),
-      [],
-    );
+  const cv2Names = ['x-ga-measurement-id', 'x-ga-session-id', 'x-ga-session-properties'];
+  const pa1Names = ['x-pa-measurement-id', 'x-pa-session-id', 'x-pa-session-properties'];
+  const assertOwnedNames = (headers) => {
+    const actual = Object.keys(headers).filter((name) => (
+      /^(?:x-ga-|x-pa-|x-amplitude-|x-ym-)/.test(name)
+    )).sort();
+    assert.deepEqual(actual, [...(productOnly ? [] : cv2Names), ...pa1Names].sort());
   };
+  const decodeEnvelope = (headers, name) => JSON.parse(
+    Buffer.from(headers[name], 'base64url').toString('utf8'),
+  );
   const assertConversion = (headers, testCase) => {
-    assert.equal(headers['x-ga-measurement-id'], 'cv2');
+    assert.equal(headers['x-ga-measurement-id'], 'G-8F3K2M7Q');
     assert.equal(headers['x-ga-session-id'], testCase.pulse);
-    assert.equal(headers['x-amplitude-device-id'], testCase.score);
-    assert.equal(headers['x-amplitude-event-id'], testCase.clickId);
-    assert.equal(headers['x-ym-counter-client'], 'v2.10.4-pixel');
-    assert.ok(headers['x-amplitude-device-id'].startsWith(testCase.scorePrefix));
-    assertProperties(headers);
+    const envelope = decodeEnvelope(headers, 'x-ga-session-properties');
+    assert.deepEqual(Object.keys(envelope), ['client', 'eid', 'props', 'sum', 'v']);
+    assert.equal(envelope.client, 'v2.10.4-pixel');
+    assert.equal(envelope.eid, testCase.clickId);
+    assert.deepEqual(envelope.props, []);
+    assert.equal(envelope.sum, testCase.score);
+    assert.equal(envelope.v, 'cv2');
+    assert.ok(envelope.sum.startsWith(testCase.scorePrefix));
   };
   const assertProduct = (headers, testCase) => {
-    assert.equal(headers['x-pa-measurement-id'], 'pa1');
+    assert.equal(headers['x-pa-measurement-id'], 'PA-59DK2M8Q');
     assert.equal(headers['x-pa-session-id'], testCase.pulse);
-    assert.equal(headers['x-pa-device-id'], testCase.score);
-    assert.equal(headers['x-pa-event-id'], testCase.eventId);
     assert.ok(headers['x-pa-session-properties'].length <= 1400);
-    const snapshot = JSON.parse(Buffer.from(headers['x-pa-session-properties'], 'base64url').toString('utf8'));
+    const envelope = decodeEnvelope(headers, 'x-pa-session-properties');
+    assert.deepEqual(Object.keys(envelope), ['data', 'eid', 'sum', 'v']);
+    assert.equal(envelope.eid, testCase.eventId);
+    assert.equal(envelope.sum, testCase.score);
+    assert.equal(envelope.v, 'pa1');
+    const snapshot = JSON.parse(envelope.data);
     assert.equal(snapshot.viewId, testCase.viewId);
     assert.equal(snapshot.features & 1, productOnly ? 0 : 1);
     assert.equal(snapshot.features & 4, 4, 'Canvas2D must use an independent real context');
@@ -328,13 +339,8 @@ try {
     assert.ok(Array.isArray(snapshot.engagement) && snapshot.engagement.length === 4);
   };
   const assertRequest = (headers, conversionCase, productCase) => {
-    if (productOnly) {
-      for (const name of ['x-ga-measurement-id', 'x-ga-session-id', 'x-amplitude-device-id', 'x-amplitude-event-id', 'x-amplitude-session-properties', 'x-ym-counter-client']) {
-        assert.equal(headers[name], undefined, `${name} must be absent in product-only mode`);
-      }
-    } else {
-      assertConversion(headers, conversionCase);
-    }
+    assertOwnedNames(headers);
+    if (!productOnly) assertConversion(headers, conversionCase);
     assertProduct(headers, productCase);
   };
   const click = async (index, expectedRequests) => {
@@ -371,7 +377,10 @@ try {
   const missingHeaders = headersOf(requests[1]);
   assertRequest(missingHeaders, missingLogin, productMissingLogin);
   if (!productOnly) {
-    assert.notEqual(missingHeaders['x-amplitude-device-id'], validHeaders['x-amplitude-device-id']);
+    assert.notEqual(
+      decodeEnvelope(missingHeaders, 'x-ga-session-properties').sum,
+      decodeEnvelope(validHeaders, 'x-ga-session-properties').sum,
+    );
   }
 
   // Empty and duplicate markers use the same fallback but distinct click sequences.
@@ -419,6 +428,12 @@ try {
   const wasmRequests = networkUrls.filter((url) => new URL(url).pathname.endsWith('.wasm'));
   console.log(`Browser check: validating ${packageVariant} package network behavior.`);
   assert.deepEqual(wasmRequests, [], `Unexpected Wasm requests: ${wasmRequests.join(', ')}`);
+  assert.equal(requests.length, 5, 'Exactly five API requests are expected');
+  assert.deepEqual(
+    networkUrls.filter((url) => /\/(?:collect|track|analytics)(?:[/?]|$)/.test(new URL(url).pathname)),
+    [],
+    'Packages must not create additional analytics requests',
+  );
   if (packageVariant === 'embedded') {
     assert.deepEqual(deferredScriptRequests(), [], 'embedded package must not request a separate runtime chunk');
   } else {

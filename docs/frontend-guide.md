@@ -68,7 +68,7 @@ hash-security/
 │       ├── src/engagement.ts             # Capped counters/bitmask
 │       ├── src/graphics.ts               # Обобщённая graphics category
 │       ├── src/snapshot.ts               # Compact analytics JSON
-│       ├── src/product-analytics.ts      # Facade и пять headers
+│       ├── src/product-analytics.ts      # Facade и три headers
 │       ├── src/providers.ts              # Ранний Angular start
 │       └── src/angular-interceptor.ts    # Независимый pa1 interceptor
 │
@@ -231,7 +231,7 @@ npm run build --workspace demo-web -- --configuration=staging
 apps/demo-web/dist/demo-web/browser/
 ```
 
-В environments остаётся только `touchpoint` — значение `data-tag` текущей сборки. `pixelUrl` удалён из всех конфигураций.
+Environments содержат `touchpoint`, `analyticsView` и два публичных project ID: `telemetryMeasurementId` и `analyticsMeasurementId`. Каждый environment задаёт собственные значения. `pixelUrl` отсутствует: WASM встроен в JS.
 
 ## 7. Почему корневая команда именно такая
 

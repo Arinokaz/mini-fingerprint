@@ -9,6 +9,7 @@ UInt32                 Только 32-битная арифметика без 
 PropertyCodec          Проверка, сортировка и канонизация свойств.
 PulseCodec             Обратимое кодирование/декодирование времени.
 ClickCodec             Строгие 32 hex ↔ 16 байт clickId и prefix check.
+EventEnvelope          Strict base64url/JSON и canonical fields cv2/pa1.
 JourneyContext         Проверенные входные данные одного вычисления.
 FunnelStageInterface   Общий интерфейс четырёх рабочих стадий.
 FrameReducer           Порядок стадий и сериализация кадра.
@@ -226,7 +227,22 @@ function matches(profile, journey, clickId, pulse, score, propertiesJson, server
         return false
 ```
 
-HTTP-слой позднее будет только читать заголовки, строго base64url-декодировать свойства, вызывать `matches()` и возвращать одинаковый `403` для любой ошибки.
+HTTP-слой позднее будет читать ровно три cv2 headers и возвращать одинаковый `403` для любой ошибки:
+
+```pseudo
+measurementId = header("X-GA-Measurement-Id")
+require measurementId == env TELEMETRY_PROJECT_ID
+pulse = header("X-GA-Session-Id")
+envelopeJson = strictBase64UrlDecode(header("X-GA-Session-Properties"))
+envelope = strictJsonObject(envelopeJson)
+require keys(envelope) == ["client", "eid", "props", "sum", "v"] in this order
+require deterministicJson(envelope) == envelopeJson
+require envelope.client == "v2.10.4-pixel"
+propertiesJson = deterministicJson(envelope.props)
+matches(envelope.v, actualServerRoute, envelope.eid, pulse, envelope.sum, propertiesJson, serverTime, configuredPrefix)
+```
+
+Неизвестные/отсутствующие поля, padding, неканонический JSON и legacy `X-Amplitude-*`/`X-YM-*` headers не используются как альтернативный transport.
 
 ## 7. Минимальный набор будущих тестов
 
@@ -250,9 +266,9 @@ PageUInt32          Четыре lanes, add/sub/mul/rotate без float.
 PagePulseCodec      Обратимое время pa1.
 PageIdentifier      Строгие 32 hex ↔ 16 bytes для viewId/eventId.
 PageFrameReducer    Стадии page/view/event/time.
-ProductCheckpoint   Формат пяти headers, TTL и score.
+ProductCheckpoint   Project ID, три headers, strict envelope, TTL и score.
 ```
 
-`ProductCheckpoint` использует фактический route и server-configured `data-view`, повторяет `pa1`, проверяет размер analytics snapshot и возвращает generic 403 для любой ошибки. Graphics/engagement не входят в score.
+`ProductCheckpoint` проверяет `X-PA-Measurement-Id` через project configuration, декодирует `X-PA-Session-Id` и strict envelope из `X-PA-Session-Properties` с полями `data,eid,sum,v`. Он использует фактический route и server-configured `data-view`, повторяет `pa1`, проверяет размер analytics snapshot и возвращает generic 403 для любой ошибки. Graphics/engagement не входят в score.
 
-После синхронной проверки backend может передать envelope во внутренний сервис обработки признаков. Эта передача и сама аналитика отложены и не блокируют текущий запрос.
+После синхронной проверки backend может передать `data` из envelope во внутренний сервис обработки признаков. Эта передача и сама аналитика отложены и не блокируют текущий запрос.

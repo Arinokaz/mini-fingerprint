@@ -50,13 +50,15 @@ test('built pa1 воспроизводит golden headers и соблюдает 
     Math.random = () => 0;
     Object.defineProperty(performance, 'now', { configurable: true, value: () => 0 });
     const { ProductAnalytics } = await import(pathToFileURL(resolve(packageRoot, 'dist/index.js')).href);
-    const sdk = new ProductAnalytics();
+    const sdk = new ProductAnalytics({ measurementId: 'PA-TEST-123' });
     await sdk.getEngagementHeaders(testCase.actionPath);
     const headers = await sdk.getEngagementHeaders(testCase.actionPath);
-    assert.equal(headers['X-PA-Measurement-Id'], 'pa1');
+    assert.equal(headers['X-PA-Measurement-Id'], 'PA-TEST-123');
     assert.equal(headers['X-PA-Session-Id'], testCase.pulse);
-    assert.equal(headers['X-PA-Device-Id'], testCase.score);
-    assert.equal(headers['X-PA-Event-Id'], testCase.eventId);
+    const envelope = JSON.parse(Buffer.from(headers['X-PA-Session-Properties'], 'base64url').toString('utf8'));
+    assert.equal(envelope.sum, testCase.score);
+    assert.equal(envelope.eid, testCase.eventId);
+    assert.equal(envelope.v, 'pa1');
     assert.ok(headers['X-PA-Session-Properties'].length <= 1400);
     assert.ok(Buffer.byteLength(JSON.stringify(headers), 'utf8') <= 2048);
   } finally {

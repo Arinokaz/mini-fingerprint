@@ -1,0 +1,21 @@
+{
+  "profile": "analytics-transport-v1",
+  "cases": [
+    {
+      "name": "cv2-three-header-envelope",
+      "profile": "cv2",
+      "measurementId": "G-TEST-123",
+      "pulse": "0011223344556677",
+      "envelopeJson": "{\"client\":\"v2.10.4-pixel\",\"eid\":\"0123456789abcdef0123456789abcdef\",\"props\":[[\"a.first\",\"значение\"],[\"z.last\",\"value:with:colon\"]],\"sum\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"v\":\"cv2\"}",
+      "envelope": "eyJjbGllbnQiOiJ2Mi4xMC40LXBpeGVsIiwiZWlkIjoiMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWYiLCJwcm9wcyI6W1siYS5maXJzdCIsItC30L3QsNGH0LXQvdC40LUiXSxbInoubGFzdCIsInZhbHVlOndpdGg6Y29sb24iXV0sInN1bSI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWYiLCJ2IjoiY3YyIn0"
+    },
+    {
+      "name": "pa1-three-header-envelope",
+      "profile": "pa1",
+      "measurementId": "PA-TEST-123",
+      "pulse": "0011223344556677",
+      "envelopeJson": "{\"data\":\"{\\\"v\\\":1,\\\"viewId\\\":\\\"00112233445566778899aabbccddeeff\\\"}\",\"eid\":\"0123456789abcdef0123456789abcdef\",\"sum\":\"0123456789abcdef0123456789abcdef\",\"v\":\"pa1\"}",
+      "envelope": "eyJkYXRhIjoie1widlwiOjEsXCJ2aWV3SWRcIjpcIjAwMTEyMjMzNDQ1NTY2Nzc4ODk5YWFiYmNjZGRlZWZmXCJ9IiwiZWlkIjoiMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWYiLCJzdW0iOiIwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZiIsInYiOiJwYTEifQ"
+    }
+  ]
+}

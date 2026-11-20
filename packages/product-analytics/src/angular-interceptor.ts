@@ -19,7 +19,7 @@ const HEADER_NAMES = [
   PROPERTIES_HEADER,
 ] as const;
 
-/** Удаляет только собственные pa1 headers после ошибки генерации. */
+/** Удаляет current и legacy pa1 headers после ошибки генерации. */
 function withoutAnalyticsHeaders(request: HttpRequest<unknown>): HttpRequest<unknown> {
   if (!HEADER_NAMES.some((name) => request.headers.has(name))) {
     return request;
@@ -37,7 +37,9 @@ export const productAnalyticsInterceptor: HttpInterceptorFn = (request, next) =>
   const document = inject(DOCUMENT);
   return from(Promise.resolve().then(async () => {
     const pathname = new URL(request.url, document.baseURI).pathname;
-    return request.clone({ setHeaders: await analytics.getEngagementHeaders(pathname) });
+    return withoutAnalyticsHeaders(request).clone({
+      setHeaders: await analytics.getEngagementHeaders(pathname),
+    });
   })).pipe(
     catchError(() => of(withoutAnalyticsHeaders(request))),
     switchMap((outgoingRequest) => next(outgoingRequest)),

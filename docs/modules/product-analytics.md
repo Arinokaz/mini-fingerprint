@@ -18,7 +18,7 @@ import {
 
 ```typescript
 providers: [
-  provideProductAnalytics(),
+  provideProductAnalytics({ measurementId: environment.analyticsMeasurementId }),
   provideHttpClient(withInterceptors([
     productAnalyticsInterceptor,
     marketingTelemetryInterceptor,
@@ -26,29 +26,27 @@ providers: [
 ]
 ```
 
-`provideProductAnalytics()` не принимает settings. Root facade создаётся через `PRODUCT_ANALYTICS`, а `ENVIRONMENT_INITIALIZER` заранее вызывает `start()` и устанавливает engagement listeners.
+`provideProductAnalytics({ measurementId })` принимает публичный project ID. Root facade создаётся через `PRODUCT_ANALYTICS`, а `ENVIRONMENT_INITIALIZER` заранее вызывает `start()` и устанавливает engagement listeners. Отсутствующий или некорректный ID вызывает generation failure.
 
 Ручной API:
 
 ```typescript
-const analytics = new ProductAnalytics();
+const analytics = new ProductAnalytics({ measurementId: 'PA-59DK2M8Q' });
 analytics.start();
 const headers = await analytics.getEngagementHeaders('/api/auth/login');
 ```
 
 `start()` идемпотентен. Поздний запуск не восстанавливает события, произошедшие до установки listeners.
 
-## 2. Пять HTTP-заголовков
+## 2. Три HTTP-заголовка
 
 | Заголовок | Содержимое |
 |---|---|
-| `X-PA-Measurement-Id` | `pa1` |
+| `X-PA-Measurement-Id` | Публичный project ID из environment |
 | `X-PA-Session-Id` | Обратимо закодированный timestamp, 16 lowercase hex |
-| `X-PA-Device-Id` | 128-битный score, 32 lowercase hex |
-| `X-PA-Event-Id` | Event ID текущего запроса, 32 lowercase hex |
-| `X-PA-Session-Properties` | Compact analytics JSON в base64url без padding |
+| `X-PA-Session-Properties` | Base64url canonical envelope `data,eid,sum,v` |
 
-Screen/device/locale/runtime/graphics/engagement находятся внутри одного properties header. Static noise header не используется.
+`data` содержит compact analytics snapshot, `eid` — event ID, `sum` — 32-hex score, `v=pa1`. Screen/device/locale/runtime/graphics/engagement находятся внутри `data`. Static noise header и отдельные `X-PA-Device-Id`/`X-PA-Event-Id` не используются.
 
 ## 3. DOM marker
 
@@ -162,15 +160,15 @@ Listeners пассивны, не отправляют отдельных соб�
 
 ```text
 raw snapshot <= 1024 bytes
-base64url properties <= 1400 chars
-все пять headers <= 2 KB
+base64url transport envelope <= 1400 chars
+все три headers <= 2 KB
 ```
 
-Representative test snapshot занимает 206 raw bytes и 275 base64url chars. Минифицированный `dist/index.js` текущей сборки — 9560 bytes / 4117 gzip; сам `.tgz` — 6069 bytes. Это измеренный baseline, а не жёсткий лимит для каждой будущей версии.
+Representative test snapshot занимает 206 raw bytes и 275 base64url chars до обёртки в transport envelope. Минифицированный `dist/index.js` текущей сборки — 9861 bytes; сам `.tgz` — 6251 bytes. Это измеренный baseline, а не жёсткий лимит для каждой будущей версии.
 
 ## 7. Ошибки и совместная работа с Wasm
 
-`productAnalyticsInterceptor` обрабатывает все `HttpClient`-запросы. При ошибке генерации удаляются только собственные пять `X-PA-*` headers; шесть заголовков `cv2` и unrelated headers сохраняются. Downstream HTTP-ошибка не вызывает retry.
+`productAnalyticsInterceptor` обрабатывает все `HttpClient`-запросы. При успехе или ошибке генерации удаляются current+legacy pa1 values, после чего при успехе устанавливаются ровно три текущих headers; три заголовка `cv2` и unrelated headers сохраняются. Downstream HTTP-ошибка не вызывает retry.
 
 При отключённом WebAssembly в browser-check:
 
@@ -199,7 +197,7 @@ Build использует TypeScript declarations и минифицирован
 | `engagement.test.ts` | Пустое состояние, buckets, listeners, повторный start |
 | `graphics.test.ts` | Unknown/software/standard/unavailable без raw renderer |
 | `snapshot.test.ts` | Compact JSON, Unicode/number limits, size budget |
-| `product-analytics.test.ts` | Точные пять headers и последовательность DOM states |
+| `product-analytics.test.ts` | Точные три headers, envelope и последовательность DOM states |
 | `angular-interceptor.test.ts` | Все методы, cleanup, сохранение cv2, отсутствие retry |
 | `providers.test.ts` | Автоматический ранний Angular start |
 | `release.test.ts` | `.tgz`, scanner, built golden headers |

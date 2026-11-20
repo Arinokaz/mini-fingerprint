@@ -124,20 +124,33 @@ TypeScript ищет `canvas.analytics_stage`. Marker принимается то
 
 ## 9. HTTP-заголовки
 
+Передаются ровно три заголовка:
+
 | Заголовок | Значение |
 |---|---|
-| `X-PA-Measurement-Id` | `pa1` |
+| `X-PA-Measurement-Id` | Публичный project ID приложения, 3–64 символа по `/^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/` |
 | `X-PA-Session-Id` | pulse, 16 hex |
-| `X-PA-Device-Id` | score, 32 hex |
-| `X-PA-Event-Id` | eventId, 32 hex |
-| `X-PA-Session-Properties` | compact analytics JSON в base64url без padding |
+| `X-PA-Session-Properties` | Canonical event envelope JSON в UTF-8, base64url без padding |
 
-Snapshot имеет поля `v`, `viewId`, `screen`, `viewport`, `dpr`, `cores`, `touch`, `lang`, `tz`, `gfx`, `features`, `engagement` в указанном порядке. Raw JSON не превышает 1024 bytes, base64url — 1400 chars.
+Project ID является environment-конфигурацией и не секретом. Envelope имеет ровно четыре поля в каноническом порядке:
+
+```json
+{
+  "data": "serialized analytics snapshot",
+  "eid": "00112233445566778899aabbccddeeff",
+  "sum": "32 lowercase hex",
+  "v": "pa1"
+}
+```
+
+`data` содержит существующий serialized snapshot, `eid` — eventId, `sum` — score. Отдельные `X-PA-Device-Id` и `X-PA-Event-Id` больше не создаются и удаляются interceptor при fail-open как legacy values.
+
+Snapshot внутри `data` имеет поля `v`, `viewId`, `screen`, `viewport`, `dpr`, `cores`, `touch`, `lang`, `tz`, `gfx`, `features`, `engagement` в указанном порядке. Raw snapshot JSON не превышает 1024 bytes. Полный base64url transport envelope не превышает 1400 chars, а все три pa1 headers вместе — 2048 bytes.
 
 `gfx`: 0 unknown, 1 standard, 2 software, 3 unavailable. `engagement`: `[active,countBucket,categoryMask,ageBucket]`. Детальная семантика определяется design и зеркальными fixtures; ни одно значение не меняет score.
 
 ## 10. Будущая серверная проверка
 
-Backend должен проверить форматы/размеры, восстановить timestamp и TTL, использовать фактический route и ожидаемый server view marker, повторить четыре stage и сравнить score через `hash_equals()`.
+Backend должен проверить ожидаемый project ID, форматы/размеры, восстановить timestamp и TTL, строго декодировать envelope и проверить точный набор/канонический порядок его полей. Затем он использует фактический route и ожидаемый server view marker, повторяет четыре stage и сравнивает score через `hash_equals()`.
 
-Analytics envelope передаётся в отдельный внутренний процессор асинхронно. Он не нужен для синхронного вычисления score. Отсутствие single-use хранилища допускает replay в пределах TTL; это ограничение должно быть учтено при backend rollout.
+Analytics `data` передаётся в отдельный внутренний процессор асинхронно. Он не нужен для синхронного вычисления score. Отсутствие single-use хранилища допускает replay в пределах TTL; это ограничение должно быть учтено при backend rollout.

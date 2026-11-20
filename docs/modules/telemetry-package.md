@@ -44,7 +44,7 @@ const telemetry = new TelemetrySdk({
 });
 ```
 
-Конструктор принимает `settings: TelemetrySettings = {}` и необязательный `loader: RuntimeLoader = loadPixelRuntime`. По умолчанию `scorePrefix = "00"`. Допустимы `""`, `"0"`, `"00"` и `"000"`; остальные значения отклоняются до инициализации runtime. Constructor создаёт `RuntimeGate`, но сам по себе WASM не инициализирует.
+Конструктор принимает `settings: TelemetrySettings = {}` и необязательный `loader: RuntimeLoader = loadPixelRuntime`. `settings.measurementId` задаёт публичный project ID; отсутствующее или некорректное значение отклоняет generation до инициализации runtime. По умолчанию `scorePrefix = "00"`. Допустимы `""`, `"0"`, `"00"` и `"000"`; остальные значения отклоняются до инициализации runtime. Constructor создаёт `RuntimeGate`, но сам по себе WASM не инициализирует.
 
 Параметр `loader` прежде всего нужен TypeScript-тестам. В Angular настройки передаются через provider `TELEMETRY_SETTINGS`; root `TELEMETRY_SDK` использует их при создании фасада.
 
@@ -62,7 +62,7 @@ async getConversionHeaders(
 - `actionPath` — API-путь, например `/api/auth/login`;
 - `properties` — дополнительные строковые свойства; по умолчанию пустой объект.
 
-**Результат:** Promise с шестью заголовками, перечисленными в [`../architecture.md`](../architecture.md#3-что-возвращает-npm-пакет).
+**Результат:** Promise с тремя заголовками: project ID, pulse и base64url envelope, перечисленными в [`../architecture.md`](../architecture.md#3-что-возвращает-npm-пакет).
 
 **Основная логика:**
 
@@ -70,8 +70,8 @@ async getConversionHeaders(
 2. `this.runtime.acquire()` получает уже инициализированный runtime или запускает инициализацию.
 3. `calculate_funnel_score(actionPath, JSON.stringify(inputPairs), this.scorePrefix)` вызывает Rust.
 4. `readPayload()` разбирает и проверяет JSON-ответ.
-5. Свойства повторно сериализуются из проверенного `payload.properties` и кодируются base64url.
-6. Метод возвращает все заголовки.
+5. Канонический JSON envelope собирается в порядке `client,eid,props,sum,v` из static client, clickId, properties, score и profile.
+6. Envelope кодируется base64url; метод возвращает project ID, pulse и envelope.
 
 **Side effects:** при первом вызове может загрузиться lazy chunk, декодируется WASM, Rust читает DOM и текущее время.
 
@@ -177,7 +177,7 @@ Dynamic import — единая точка, которую сборщик пре
 
 | Тип | Значение |
 |---|---|
-| `TelemetrySettings` | Настройка `conversion.scorePrefix` |
+| `TelemetrySettings` | Публичный `measurementId` и настройка `conversion.scorePrefix` |
 | `PixelRuntime` | Объект с `calculate_funnel_score(journey, propertiesJson, scorePrefix): string` |
 | `RuntimeLoader` | `() => Promise<PixelRuntime>` |
 | `ConversionProperty` | Кортеж `[name: string, value: string]` |
@@ -187,7 +187,7 @@ Dynamic import — единая точка, которую сборщик пре
 
 ## 8. Настройки — `src/settings.ts`
 
-Централизует шесть названий заголовков, `DEFAULT_SCORE_PREFIX = "00"` и `COUNTER_CLIENT = 'v2.10.4-pixel'`. При переименовании заголовка нужно менять не только эту константу, но и серверную проверку, CORS allowlist и тесты.
+Централизует три текущих названия заголовков, legacy names для fail-open cleanup, `DEFAULT_SCORE_PREFIX = "00"` и `COUNTER_CLIENT = 'v2.10.4-pixel'`. При переименовании заголовка нужно менять не только эту константу, но и серверную проверку, CORS allowlist и тесты.
 
 ## 9. Generated base64 — `src/generated-pixel.ts`
 

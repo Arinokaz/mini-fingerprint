@@ -112,3 +112,25 @@ async function validateProductAnalytics() {
 }
 
 await validateProductAnalytics();
+
+/** Validates independent canonical transport vectors without re-encoding them here. */
+const transport = JSON.parse(await readFile(
+  new URL('../tests/fixtures/analytics-transport-v1.json', import.meta.url),
+  'utf8',
+));
+assert.equal(transport.profile, 'analytics-transport-v1');
+assert.ok(Array.isArray(transport.cases) && transport.cases.length === 2);
+for (const testCase of transport.cases) {
+  assert.match(testCase.measurementId, /^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/);
+  assert.match(testCase.pulse, /^[0-9a-f]{16}$/);
+  assert.doesNotMatch(testCase.envelope, /=/);
+  const json = Buffer.from(testCase.envelope, 'base64url').toString('utf8');
+  assert.equal(json, testCase.envelopeJson, `${testCase.name}: non-canonical transport encoding.`);
+  const envelope = JSON.parse(json);
+  const expectedKeys = testCase.profile === 'cv2'
+    ? ['client', 'eid', 'props', 'sum', 'v']
+    : ['data', 'eid', 'sum', 'v'];
+  assert.deepEqual(Object.keys(envelope), expectedKeys);
+  assert.equal(envelope.v, testCase.profile);
+}
+console.log(`transport: ${transport.cases.length} canonical envelopes validated.`);

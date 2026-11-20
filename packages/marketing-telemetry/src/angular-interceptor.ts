@@ -8,6 +8,7 @@ import {
   COUNTER_HEADER,
   DEVICE_HEADER,
   EVENT_HEADER,
+  LEGACY_PROPERTIES_HEADER,
   MEASUREMENT_HEADER,
   PROPERTIES_HEADER,
   SESSION_HEADER,
@@ -19,6 +20,7 @@ const TELEMETRY_HEADER_NAMES = [
   DEVICE_HEADER,
   EVENT_HEADER,
   PROPERTIES_HEADER,
+  LEGACY_PROPERTIES_HEADER,
   COUNTER_HEADER,
 ] as const;
 
@@ -57,7 +59,7 @@ export const marketingTelemetryInterceptor: HttpInterceptorFn = (request, next) 
   const document = inject(DOCUMENT);
   return from(Promise.resolve().then(async () => {
     const headers = await telemetry.getConversionHeaders(requestPath(request, document.baseURI), {});
-    return request.clone({ setHeaders: headers });
+    return withoutTelemetryHeaders(request).clone({ setHeaders: headers });
   })).pipe(
     catchError(() => of(withoutTelemetryHeaders(request))),
     switchMap((outgoingRequest) => next(outgoingRequest)),

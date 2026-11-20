@@ -1,9 +1,6 @@
 import { RuntimeGate, loadPixelRuntime } from './runtime.js';
 import {
   COUNTER_CLIENT,
-  COUNTER_HEADER,
-  DEVICE_HEADER,
-  EVENT_HEADER,
   DEFAULT_SCORE_PREFIX,
   MEASUREMENT_HEADER,
   PROPERTIES_HEADER,
@@ -29,9 +26,12 @@ export class TelemetrySdk {
 
   /** Неизменяемая настройка отбора результата для этого экземпляра. */
   private readonly scorePrefix: string;
+  /** Публичный project identifier, проверяемый перед генерацией. */
+  private readonly measurementId: string | undefined;
 
   /** Создаёт фасад с настройками и необязательным loader для тестов. */
   constructor(settings: TelemetrySettings = {}, loader: RuntimeLoader = loadPixelRuntime) {
+    this.measurementId = settings.measurementId;
     const scorePrefix = settings.conversion?.scorePrefix ?? DEFAULT_SCORE_PREFIX;
     if (!/^0{0,3}$/.test(scorePrefix)) {
       throw new Error('Unsupported scorePrefix');
@@ -52,6 +52,9 @@ export class TelemetrySdk {
     actionPath: string,
     properties: Record<string, string> = {},
   ): Promise<Record<string, string>> {
+    if (typeof this.measurementId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/.test(this.measurementId)) {
+      throw new Error('Invalid measurementId');
+    }
     // На границу WASM свойства передаются массивом пар, а не JSON-объектом.
     const inputPairs = Object.entries(properties);
     const runtime = await this.runtime.acquire();
@@ -61,17 +64,23 @@ export class TelemetrySdk {
       this.scorePrefix,
     );
     const payload = readPayload(rawPayload);
-    const propertyJson = JSON.stringify(payload.properties);
-
     return {
-      [MEASUREMENT_HEADER]: payload.profile,
+      [MEASUREMENT_HEADER]: this.measurementId,
       [SESSION_HEADER]: payload.pulse,
-      [DEVICE_HEADER]: payload.score,
-      [EVENT_HEADER]: payload.clickId,
-      [PROPERTIES_HEADER]: encodeBase64Url(propertyJson),
-      [COUNTER_HEADER]: COUNTER_CLIENT,
+      [PROPERTIES_HEADER]: encodeConversionEnvelope(payload),
     };
   }
+}
+
+/** Кодирует проверенный cv2 payload в canonical event envelope. */
+export function encodeConversionEnvelope(payload: ConversionPayload): string {
+  return encodeBase64Url(JSON.stringify({
+    client: COUNTER_CLIENT,
+    eid: payload.clickId,
+    props: payload.properties,
+    sum: payload.score,
+    v: payload.profile,
+  }));
 }
 
 /**

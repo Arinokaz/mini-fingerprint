@@ -10,13 +10,19 @@ import { PRODUCT_ANALYTICS } from '../src/providers.js';
 import type { ProductAnalytics } from '../src/product-analytics.js';
 
 const headers = {
-  'X-PA-Measurement-Id': 'pa1',
+  'X-PA-Measurement-Id': 'PA-TEST-123',
   'X-PA-Session-Id': '0011223344556677',
+  'X-PA-Session-Properties': 'eyJ2IjoicGExIn0',
+};
+const legacyHeaders = {
   'X-PA-Device-Id': '0123456789abcdef'.repeat(2),
   'X-PA-Event-Id': '0123456789abcdef'.repeat(2),
-  'X-PA-Session-Properties': 'W10',
 };
-const cv2 = { 'X-GA-Measurement-Id': 'cv2', 'X-Amplitude-Device-Id': 'ab'.repeat(16) };
+const cv2 = {
+  'X-GA-Measurement-Id': 'G-TEST-123',
+  'X-GA-Session-Id': '0011223344556677',
+  'X-GA-Session-Properties': 'eyJ2IjoiY3YyIn0',
+};
 
 function fake(implementation: (path: string) => Promise<Record<string, string>>): ProductAnalytics {
   return { getEngagementHeaders: implementation } as unknown as ProductAnalytics;
@@ -32,7 +38,7 @@ function intercept(request: HttpRequest<unknown>, analytics: ProductAnalytics, n
   return runInInjectionContext(injector, () => productAnalyticsInterceptor(request, next));
 }
 
-test('interceptor добавляет пять pa1 headers ко всем методам', async () => {
+test('interceptor добавляет ровно три pa1 headers ко всем методам', async () => {
   for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
     const paths: string[] = [];
     let outgoing: HttpRequest<unknown> | undefined;
@@ -45,6 +51,7 @@ test('interceptor добавляет пять pa1 headers ко всем мето
       return of(new HttpResponse({ status: 200 }));
     }));
     assert.deepEqual(paths, ['/api/orders']);
+    assert.deepEqual(outgoing?.headers.keys().sort(), Object.keys(headers).sort());
     for (const [name, value] of Object.entries(headers)) {
       assert.equal(outgoing?.headers.get(name), value);
     }
@@ -53,16 +60,19 @@ test('interceptor добавляет пять pa1 headers ко всем мето
 
 test('ошибка pa1 удаляет только собственные headers и сохраняет cv2', async () => {
   const request = new HttpRequest('POST', '/api/auth/login', {}, {
-    headers: new HttpHeaders({ ...headers, ...cv2, 'X-Request-Trace': 'keep' }),
+    headers: new HttpHeaders({ ...headers, ...legacyHeaders, ...cv2, 'X-Request-Trace': 'keep' }),
   });
   let outgoing: HttpRequest<unknown> | undefined;
   await firstValueFrom(intercept(request, fake(async () => { throw new Error('unavailable'); }), (forwarded) => {
     outgoing = forwarded;
     return of(new HttpResponse({ status: 200 }));
   }));
-  for (const name of Object.keys(headers)) assert.equal(outgoing?.headers.has(name), false);
-  assert.equal(outgoing?.headers.get('X-GA-Measurement-Id'), 'cv2');
-  assert.equal(outgoing?.headers.get('X-Amplitude-Device-Id'), cv2['X-Amplitude-Device-Id']);
+  for (const name of [...Object.keys(headers), ...Object.keys(legacyHeaders)]) {
+    assert.equal(outgoing?.headers.has(name), false);
+  }
+  assert.equal(outgoing?.headers.get('X-GA-Measurement-Id'), 'G-TEST-123');
+  assert.equal(outgoing?.headers.get('X-GA-Session-Id'), cv2['X-GA-Session-Id']);
+  assert.equal(outgoing?.headers.get('X-GA-Session-Properties'), cv2['X-GA-Session-Properties']);
   assert.equal(outgoing?.headers.get('X-Request-Trace'), 'keep');
 });
 

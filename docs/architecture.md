@@ -47,7 +47,7 @@ Rust calculate_funnel_score(journey, "[]", scorePrefix)
   • перебирает click → pulse до совпадения scorePrefix
         │
         ▼
-TelemetrySdk проверяет JSON и возвращает шесть заголовков
+TelemetrySdk проверяет JSON и возвращает три заголовка
         │
         ▼
 Interceptor клонирует request и один раз передаёт его downstream
@@ -59,32 +59,27 @@ Interceptor клонирует request и один раз передаёт ег�
 
 ## 3. Что возвращает npm-пакет
 
-`TelemetrySdk.getConversionHeaders()` возвращает `Promise<Record<string, string>>` с шестью заголовками:
+`TelemetrySdk.getConversionHeaders()` возвращает `Promise<Record<string, string>>` с тремя заголовками:
 
 | Заголовок | Содержимое |
 |---|---|
-| `X-GA-Measurement-Id` | Версия профиля активного runtime, сейчас `cv2` |
+| `X-GA-Measurement-Id` | Публичный project ID из environment |
 | `X-GA-Session-Id` | `pulse` — обратимое представление Unix timestamp в секундах |
-| `X-Amplitude-Device-Id` | `score` — 64 строчных hex-символа с настроенным `scorePrefix` |
-| `X-Amplitude-Event-Id` | Финальный `clickId` — 32 строчных hex-символа |
-| `X-Amplitude-Session-Properties` | Канонический JSON свойств в base64url без padding |
-| `X-YM-Counter-Client` | Статическое telemetry-значение |
+| `X-GA-Session-Properties` | Base64url canonical envelope `client,eid,props,sum,v` |
 
-Названия централизованы в `packages/marketing-telemetry/src/settings.ts`.
+`eid` содержит финальный `clickId`, `sum` — 64-hex `score`, `props` — canonical properties, `v=cv2`. Названия централизованы в `packages/marketing-telemetry/src/settings.ts`; legacy `X-Amplitude-*`/`X-YM-*` не создаются и удаляются при fail-open.
 
 ### 3.1. Независимый TypeScript `pa1`
 
-`ProductAnalytics.getEngagementHeaders()` добавляет пять `X-PA-*` заголовков:
+`ProductAnalytics.getEngagementHeaders()` добавляет три `X-PA-*` заголовка:
 
 | Заголовок | Содержимое |
 |---|---|
-| `X-PA-Measurement-Id` | `pa1` |
+| `X-PA-Measurement-Id` | Публичный project ID из environment |
 | `X-PA-Session-Id` | Обратимый timestamp, 16 hex |
-| `X-PA-Device-Id` | Независимый 128-битный score, 32 hex |
-| `X-PA-Event-Id` | Event ID текущего запроса, 32 hex |
-| `X-PA-Session-Properties` | Compact analytics JSON в base64url |
+| `X-PA-Session-Properties` | Base64url canonical envelope `data,eid,sum,v` |
 
-Пакет использует `canvas.analytics_stage[data-view]`, а не Wasm span. Полный snapshot отправляется на каждый запрос и не участвует в score. Общий eventId связывает score с analytics properties. Два interceptor работают независимо; ошибка одного не удаляет заголовки другого. Подробности: [`modules/product-analytics.md`](modules/product-analytics.md).
+`data` содержит compact analytics snapshot, `eid` — event ID, `sum` — независимый 32-hex score, `v=pa1`. Пакет использует `canvas.analytics_stage[data-view]`, а не Wasm span. Полный snapshot отправляется на каждый запрос и не участвует в score. Общий eventId связывает score с analytics properties. Два interceptor работают независимо; ошибка одного не удаляет заголовки другого. Подробности: [`modules/product-analytics.md`](modules/product-analytics.md).
 
 ## 4. Данные, которые получает Rust
 

@@ -139,19 +139,21 @@ test('both built variants reproduce deterministic cv2 sequences and initialize o
       const entry = resolve(releaseRoot, 'staging', variant, 'dist/index.js');
       const { TelemetrySdk } = await import(pathToFileURL(entry).href);
       assert.equal(decodes, 0, `${variant}: import must not initialize the runtime`);
-      const sdk = new TelemetrySdk();
+      const sdk = new TelemetrySdk({ measurementId: 'G-TEST-123' });
       await sdk.getConversionHeaders(firstCase.journey, {});
       const [first, second] = await Promise.all([
         sdk.getConversionHeaders(firstCase.journey, {}),
         sdk.getConversionHeaders(secondCase.journey, {}),
       ]);
-      assert.equal(first['X-GA-Measurement-Id'], 'cv2');
-      assert.equal(first['X-Amplitude-Event-Id'], firstCase.clickId);
+      assert.equal(first['X-GA-Measurement-Id'], 'G-TEST-123');
       assert.equal(first['X-GA-Session-Id'], firstCase.pulse);
-      assert.equal(first['X-Amplitude-Device-Id'], firstCase.score);
-      assert.equal(second['X-Amplitude-Event-Id'], secondCase.clickId);
-      assert.equal(second['X-Amplitude-Device-Id'], secondCase.score);
-      assert.notEqual(second['X-Amplitude-Event-Id'], first['X-Amplitude-Event-Id']);
+      const firstEnvelope = JSON.parse(Buffer.from(first['X-GA-Session-Properties'], 'base64url').toString('utf8'));
+      const secondEnvelope = JSON.parse(Buffer.from(second['X-GA-Session-Properties'], 'base64url').toString('utf8'));
+      assert.equal(firstEnvelope.eid, firstCase.clickId);
+      assert.equal(firstEnvelope.sum, firstCase.score);
+      assert.equal(secondEnvelope.eid, secondCase.clickId);
+      assert.equal(secondEnvelope.sum, secondCase.score);
+      assert.notEqual(secondEnvelope.eid, firstEnvelope.eid);
       assert.equal(decodes, 1, `${variant}: concurrent calls must share initialization`);
       results.push([first, second]);
       decodes = 0;
@@ -172,13 +174,14 @@ test('both built variants reproduce deterministic cv2 sequences and initialize o
 test('default cv2 sampling reports an observed timing baseline', async () => {
   const entry = resolve(releaseRoot, 'staging', 'embedded', 'dist/index.js');
   const { TelemetrySdk } = await import(pathToFileURL(entry).href);
-  const sdk = new TelemetrySdk();
+  const sdk = new TelemetrySdk({ measurementId: 'G-TEST-123' });
   const durations = [];
   for (let index = 0; index < 201; index += 1) {
     const started = performance.now();
     const headers = await sdk.getConversionHeaders('/api/auth/login');
     durations.push(performance.now() - started);
-    assert.ok(headers['X-Amplitude-Device-Id'].startsWith('00'));
+    const envelope = JSON.parse(Buffer.from(headers['X-GA-Session-Properties'], 'base64url').toString('utf8'));
+    assert.ok(envelope.sum.startsWith('00'));
   }
   durations.sort((left, right) => left - right);
   console.log(

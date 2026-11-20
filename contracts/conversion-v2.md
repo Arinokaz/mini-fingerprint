@@ -118,22 +118,38 @@ Timestamp не изменяется во время перебора. `attempts`
 
 ## 6. HTTP-заголовки
 
+Передаются ровно три заголовка:
+
 | Заголовок | Содержимое |
 |---|---|
-| `X-GA-Measurement-Id` | `cv2` |
+| `X-GA-Measurement-Id` | Публичный project ID приложения, 3–64 символа по `/^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/` |
 | `X-GA-Session-Id` | `pulse`, 16 hex |
-| `X-Amplitude-Device-Id` | `score`, 64 hex с требуемым prefix |
-| `X-Amplitude-Event-Id` | финальный `clickId`, 32 hex |
-| `X-Amplitude-Session-Properties` | base64url canonical JSON свойств без padding |
-| `X-YM-Counter-Client` | статическое telemetry-значение |
+| `X-GA-Session-Properties` | Canonical event envelope JSON в UTF-8, base64url без padding |
+
+Project ID является environment-конфигурацией и не секретом. Backend использует его для выбора конфигурации проекта.
+
+Envelope имеет ровно пять полей в следующем каноническом порядке:
+
+```json
+{
+  "client": "v2.10.4-pixel",
+  "eid": "00112233445566778899aabbccddeeff",
+  "props": [],
+  "sum": "64 lowercase hex",
+  "v": "cv2"
+}
+```
+
+`eid` содержит финальный `clickId`, `sum` — `score`, `props` — canonical pair array. Отдельные `X-Amplitude-Device-Id`, `X-Amplitude-Event-Id`, `X-Amplitude-Session-Properties` и `X-YM-Counter-Client` больше не создаются и должны удаляться interceptor при fail-open как legacy values.
 
 ## 7. Будущая серверная проверка
 
-PHP mirror должен повторить пять стадий, используя фактический маршрут, ожидаемый tag, canonical properties, полученные `clickId` и восстановленный timestamp. Дополнительно сервер:
+PHP mirror должен проверить ожидаемый project ID, повторить пять стадий, используя фактический маршрут, ожидаемый tag, canonical properties, полученные `clickId` и восстановленный timestamp. Дополнительно сервер:
 
-1. Проверяет точный формат `clickId` и `score`.
-2. Проверяет собственный настроенный `scorePrefix`.
-3. Повторно вычисляет и сравнивает score через `hash_equals()`.
-4. Возвращает generic `403` для любой ошибки без раскрытия причины.
+1. Строго декодирует base64url и JSON, проверяет точный набор и канонический порядок envelope fields.
+2. Проверяет точный формат `clickId` и `score`.
+3. Проверяет собственный настроенный `scorePrefix`.
+4. Повторно вычисляет и сравнивает score через `hash_equals()`.
+5. Возвращает generic `403` для любой ошибки без раскрытия причины.
 
 Timestamp ограничивает срок использования результата, но без отдельного single-use хранилища не запрещает повторную отправку того же набора заголовков. Replay-cache и действия по IP/сессии не входят в текущую frontend-реализацию.

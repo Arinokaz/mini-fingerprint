@@ -152,7 +152,7 @@ Go, очередь и конкретное хранилище пока не вы
 
 ### 9.1. Связь данных
 
-`eventId` из `X-PA-Event-Id` связывает проверенный conversion key и analytics snapshot. `viewId` группирует события одного view. IP и User-Agent не дублируются клиентом: backend использует собственные значения запроса.
+`eventId` из поля `eid` в `X-PA-Session-Properties` связывает проверенный conversion key и analytics snapshot. `viewId` группирует события одного view. IP и User-Agent не дублируются клиентом: backend использует собственные значения запроса.
 
 ### 9.2. Нормализованные projections
 

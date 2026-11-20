@@ -4,24 +4,24 @@ import { calculatePageResult } from './page-conversion.js';
 import { createBrowserView, PageViewSequence } from './page-view.js';
 import {
   ANALYTICS_PROFILE,
-  DEVICE_HEADER,
-  EVENT_HEADER,
   MEASUREMENT_HEADER,
   PROPERTIES_HEADER,
   SESSION_HEADER,
   UNRESOLVED_VIEW,
 } from './settings.js';
 import { createAnalyticsSnapshot, serializeSnapshot } from './snapshot.js';
-import type { GraphicsState } from './types.js';
+import type { GraphicsState, ProductAnalyticsSettings } from './types.js';
 
 /** Лёгкая product analytics интеграция без дополнительных сетевых вызовов. */
 export class ProductAnalytics {
   private readonly view: PageViewSequence;
   private readonly engagement = new EngagementState();
+  private readonly measurementId: string | undefined;
   private graphics: GraphicsState | undefined;
   private capabilities: { webgl: boolean; canvas2d: boolean } | undefined;
 
-  constructor() {
+  constructor(settings: ProductAnalyticsSettings = {}) {
+    this.measurementId = settings.measurementId;
     this.view = createBrowserView(Date.now(), globalThis.performance?.now() ?? 0);
   }
 
@@ -32,6 +32,9 @@ export class ProductAnalytics {
 
   /** Формирует независимый pa1 score и компактный analytics envelope. */
   async getEngagementHeaders(actionPath: string): Promise<Record<string, string>> {
+    if (typeof this.measurementId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/.test(this.measurementId)) {
+      throw new Error('Invalid measurementId');
+    }
     this.start();
     const nowMilliseconds = Date.now();
     const timestamp = Math.floor(nowMilliseconds / 1000);
@@ -51,7 +54,7 @@ export class ProductAnalytics {
       eventId,
       timestamp,
     });
-    const snapshot = serializeSnapshot(createAnalyticsSnapshot({
+    const data = serializeSnapshot(createAnalyticsSnapshot({
       viewId: this.view.viewId,
       screenWidth: globalThis.screen?.width ?? Number.NaN,
       screenHeight: globalThis.screen?.height ?? Number.NaN,
@@ -68,13 +71,24 @@ export class ProductAnalytics {
     }));
 
     return {
-      [MEASUREMENT_HEADER]: ANALYTICS_PROFILE,
+      [MEASUREMENT_HEADER]: this.measurementId,
       [SESSION_HEADER]: result.pulse,
-      [DEVICE_HEADER]: result.score,
-      [EVENT_HEADER]: result.eventId,
-      [PROPERTIES_HEADER]: encodeBase64Url(snapshot),
+      [PROPERTIES_HEADER]: encodeEngagementEnvelope(data, result),
     };
   }
+}
+
+/** Кодирует pa1 result и serialized snapshot в canonical event envelope. */
+export function encodeEngagementEnvelope(
+  data: string,
+  result: { eventId: string; score: string },
+): string {
+  return encodeBase64Url(JSON.stringify({
+    data,
+    eid: result.eventId,
+    sum: result.score,
+    v: ANALYTICS_PROFILE,
+  }));
 }
 
 /** Выбирает marker только из одного полностью настроенного canvas. */

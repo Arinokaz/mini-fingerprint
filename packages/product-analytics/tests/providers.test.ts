@@ -18,3 +18,11 @@ test('Angular initializer запускает сбор engagement ровно од
   assert.ok(initializers.length >= 1);
   assert.equal(starts, 1);
 });
+
+test('Angular provider передаёт project settings в root facade', async () => {
+  const injector = Injector.create({
+    providers: [provideProductAnalytics({ measurementId: 'PA-TEST-123' })],
+  });
+  const headers = await injector.get(PRODUCT_ANALYTICS).getEngagementHeaders('/api/orders');
+  assert.equal(headers['X-PA-Measurement-Id'], 'PA-TEST-123');
+});

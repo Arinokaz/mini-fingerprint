@@ -1,3 +1,9 @@
+/** Публичные настройки независимого product analytics facade. */
+export interface ProductAnalyticsSettings {
+  /** Публичный project/counter identifier текущего приложения. */
+  measurementId?: string;
+}
+
 /** Допустимая обобщённая graphics-категория analytics snapshot. */
 export type GraphicsState = 0 | 1 | 2 | 3;
 

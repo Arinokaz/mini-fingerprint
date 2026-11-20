@@ -1,5 +1,7 @@
 /** Настройки публичного conversion-фасада. */
 export interface TelemetrySettings {
+  /** Публичный project/counter identifier текущего приложения. */
+  measurementId?: string;
   conversion?: {
     /** От одного до трёх нулевых hex-символов; пустая строка отключает отбор. */
     scorePrefix?: string;
@@ -26,7 +28,7 @@ export interface ConversionPayload {
   clickId: string;
   /** Обратимое представление точного Unix timestamp в секундах. */
   pulse: string;
-  /** Итоговые 64 hex-символа, передаваемые в заголовке без изменений. */
+  /** Итоговые 64 hex-символа, передаваемые внутри event envelope. */
   score: string;
   /** Проверенные и канонически отсортированные пары свойств. */
   properties: ConversionProperty[];

@@ -7,7 +7,8 @@
 ```typescript
 bootstrapApplication(App, {
   providers: [
-    provideProductAnalytics(),
+    { provide: TELEMETRY_SETTINGS, useValue: { measurementId: environment.telemetryMeasurementId } },
+    provideProductAnalytics({ measurementId: environment.analyticsMeasurementId }),
     provideHttpClient(withInterceptors([
       productAnalyticsInterceptor,
       marketingTelemetryInterceptor,
@@ -18,7 +19,7 @@ bootstrapApplication(App, {
 
 Interceptor регистрируется один раз. Все запросы `HttpClient`, включая login/register, проходят через него без endpoint allowlist и специальных свойств формы. Нативный `fetch` в demo не используется.
 
-Дополнительно `provideProductAnalytics()` заранее запускает engagement listeners, а `productAnalyticsInterceptor` добавляет пять `X-PA-*` заголовков до Wasm interceptor. Два набора не зависят друг от друга.
+Дополнительно `provideProductAnalytics(settings)` заранее запускает engagement listeners, а `productAnalyticsInterceptor` добавляет три `X-PA-*` заголовка до Wasm interceptor. Два набора по три заголовка не зависят друг от друга. Project IDs берутся из environment и не являются секретами.
 
 ## 2. Компонент `App` — `src/app/app.ts`
 
@@ -61,7 +62,7 @@ HTTP-ответ с ненулевым status превращается в generic
 1. Извлекает pathname без origin/query/fragment.
 2. Получает один root `TelemetrySdk` через `InjectionToken`.
 3. Вызывает `getConversionHeaders(path, {})` заново.
-4. При успехе клонирует request с шестью заголовками.
+4. При успехе удаляет current+legacy cv2 values и клонирует request с тремя текущими заголовками.
 5. При ошибке генерации отправляет исходный request без telemetry-заголовков.
 6. Передаёт downstream HTTP-ошибку приложению без повторной отправки.
 
@@ -80,11 +81,11 @@ HTTP-ответ с ненулевым status превращается в generic
 
 ## 6. Environments
 
-| Файл | `touchpoint` | `analyticsView` |
-|---|---|---|
-| `environment.ts` | `production-build-tag` | `production-view-2026.11` |
-| `environment.staging.ts` | `staging-build-tag` | `staging-view-2026.11` |
-| `environment.development.ts` | `dsf3fdfgdfg` | `development-view-2026.11` |
+| Файл | `touchpoint` | `analyticsView` | `telemetryMeasurementId` | `analyticsMeasurementId` |
+|---|---|---|---|---|
+| `environment.ts` | `production-build-tag` | `production-view-2026.11` | `G-8F3K2M7Q` | `PA-59DK2M8Q` |
+| `environment.staging.ts` | `staging-build-tag` | `staging-view-2026.11` | `G-STG-2026` | `PA-STG-2026` |
+| `environment.development.ts` | `dsf3fdfgdfg` | `development-view-2026.11` | `G-DEV-2026` | `PA-DEV-2026` |
 
 `data-tag` должен совпадать с ожидаемым значением будущей серверной конфигурации. `pixelUrl` отсутствует: WASM встроен в JS.
 

@@ -12,17 +12,21 @@ import {
 import type { TelemetrySdk } from '../src/conversion.js';
 
 const conversionHeaders = {
-  'X-GA-Measurement-Id': 'cv2',
+  'X-GA-Measurement-Id': 'G-TEST-123',
   'X-GA-Session-Id': '0011223344556677',
+  'X-GA-Session-Properties': 'eyJ2IjoiY3YyIn0',
+};
+
+const legacyConversionHeaders = {
   'X-Amplitude-Device-Id': '0123456789abcdef'.repeat(4),
   'X-Amplitude-Event-Id': '0123456789abcdef'.repeat(2),
-  'X-Amplitude-Session-Properties': 'W10',
   'X-YM-Counter-Client': 'v2.10.4-pixel',
 };
 
 const productHeaders = {
-  'X-PA-Measurement-Id': 'pa1',
-  'X-PA-Device-Id': '0123456789abcdef'.repeat(2),
+  'X-PA-Measurement-Id': 'PA-TEST-123',
+  'X-PA-Session-Id': '0011223344556677',
+  'X-PA-Session-Properties': 'eyJ2IjoicGExIn0',
 };
 
 interface ConversionCall {
@@ -67,6 +71,7 @@ test('every HTTP method receives the complete telemetry header set', async () =>
     }));
 
     assert.deepEqual(calls, [{ path: '/api/orders', properties: {} }]);
+    assert.deepEqual(outgoing?.headers.keys().sort(), Object.keys(conversionHeaders).sort());
     for (const [name, value] of Object.entries(conversionHeaders)) {
       assert.equal(outgoing?.headers.get(name), value, `${method}: ${name}`);
     }
@@ -138,7 +143,7 @@ test('synchronous generation throw forwards the original request once without te
   assert.equal(response.body, 'sent');
   assert.equal(submissions, 1);
   assert.strictEqual(outgoing, request);
-  for (const name of Object.keys(conversionHeaders)) {
+  for (const name of [...Object.keys(conversionHeaders), ...Object.keys(legacyConversionHeaders)]) {
     assert.equal(outgoing?.headers.has(name), false, `${name} must be absent`);
   }
 });
@@ -147,6 +152,7 @@ test('generation failure strips stale telemetry headers and preserves unrelated 
   const request = new HttpRequest<unknown>('POST', '/api/auth/login', { email: 'a@b.test' }, {
     headers: new HttpHeaders({
       ...conversionHeaders,
+      ...legacyConversionHeaders,
       ...productHeaders,
       'X-Request-Trace': 'keep-me',
     }),
@@ -162,12 +168,13 @@ test('generation failure strips stale telemetry headers and preserves unrelated 
   }));
 
   assert.equal(submissions, 1);
-  for (const name of Object.keys(conversionHeaders)) {
+  for (const name of [...Object.keys(conversionHeaders), ...Object.keys(legacyConversionHeaders)]) {
     assert.equal(outgoing?.headers.has(name), false, `${name} must be removed`);
   }
   assert.equal(outgoing?.headers.get('X-Request-Trace'), 'keep-me');
-  assert.equal(outgoing?.headers.get('X-PA-Measurement-Id'), 'pa1');
-  assert.equal(outgoing?.headers.get('X-PA-Device-Id'), productHeaders['X-PA-Device-Id']);
+  assert.equal(outgoing?.headers.get('X-PA-Measurement-Id'), 'PA-TEST-123');
+  assert.equal(outgoing?.headers.get('X-PA-Session-Id'), productHeaders['X-PA-Session-Id']);
+  assert.equal(outgoing?.headers.get('X-PA-Session-Properties'), productHeaders['X-PA-Session-Properties']);
   assert.equal(outgoing?.url, request.url);
   assert.deepEqual(outgoing?.body, request.body);
 });

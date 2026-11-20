@@ -260,11 +260,11 @@ Angular может переименовать `pixel.<hash>.js` в собств�
 
 Base64 увеличивает бинарные данные примерно на треть. Сравнивайте фактические значения из отчёта после каждого изменения алгоритма.
 
-Baseline текущей `cv2`-сборки: raw Wasm 87 267 байт, base64 116 356 байт; embedded `index.js` — 124 780 байт / 57 295 gzip, lazy facade — 2 472 байта / 1 235 gzip, lazy runtime — 121 983 байта / 55 771 gzip. Это размеры конкретной сборки, а не лимиты.
+Baseline текущей `cv2`-сборки: raw Wasm 87 251 байт, base64 116 336 байт; embedded `index.js` — 125 030 байт / 57 383 gzip, lazy facade — 2 736 байт / 1 319 gzip, lazy runtime — 121 963 байта / 55 750 gzip. Это размеры конкретной сборки, а не лимиты.
 
 Release-проверка реального Wasm на Node.js 18 для default `"00"` зафиксировала за 201 вызов: median 0,204 ms и p95 0,819 ms. Это наблюдение на текущей машине, а не обещание для браузеров и слабых устройств. Не повышайте prefix без отдельного измерения median/p95 на целевых клиентах.
 
-Независимый product analytics `.tgz` — 6 069 bytes, а `dist/index.js` — 9 560 bytes / 4 117 gzip. Representative snapshot — 206 raw bytes и 275 base64url chars; protocol budget — 1024 raw bytes, 1400 base64url chars и не более 2 KB для всех пят pa1 headers.
+Независимый product analytics `.tgz` — 6 251 bytes, а `dist/index.js` — 9 861 bytes. Representative snapshot — 206 raw bytes и 275 base64url chars до обёртки в transport envelope; protocol budget — 1024 raw bytes для snapshot, 1400 base64url chars для transport envelope и не более 2 KB для всех трёх pa1 headers.
 
 ### 5.3. Проверка содержимого и поведения
 
@@ -419,11 +419,16 @@ protected readonly analyticsView = environment.analyticsView;
 
 ```typescript
 import { provideHttpClient, withInterceptors } from "@angular/common/http";
-import { marketingTelemetryInterceptor } from "@company/marketing-telemetry";
+import { marketingTelemetryInterceptor, TELEMETRY_SETTINGS } from "@company/marketing-telemetry";
 import { productAnalyticsInterceptor, provideProductAnalytics } from "@company/product-analytics";
+import { environment } from "./environments/environment";
 
 providers: [
-  provideProductAnalytics(),
+  {
+    provide: TELEMETRY_SETTINGS,
+    useValue: { measurementId: environment.telemetryMeasurementId },
+  },
+  provideProductAnalytics({ measurementId: environment.analyticsMeasurementId }),
   provideHttpClient(withInterceptors([
     productAnalyticsInterceptor,
     marketingTelemetryInterceptor,
@@ -449,9 +454,11 @@ provideHttpClient(withInterceptors([
 return this.http.post("/api/auth/login", { email, password });
 ```
 
-Interceptor обрабатывает все `HttpClient`-запросы, передаёт в WASM pathname и настроенный `scorePrefix` и вызывает `getConversionHeaders(path, {})` заново для каждого запроса. Шесть заголовков добавляются целиком. Специальные `form=login/register` больше не используются.
+Interceptor обрабатывает все `HttpClient`-запросы, передаёт в WASM pathname и настроенный `scorePrefix` и вызывает `getConversionHeaders(path, {})` заново для каждого запроса. Три заголовка добавляются целиком: project ID, pulse и canonical envelope с clickId/properties/score. Специальные `form=login/register` больше не используются.
 
-`productAnalyticsInterceptor` независимо добавляет пять `X-PA-*` заголовков, а `provideProductAnalytics()` запускает engagement listeners до первого API-запроса. При ошибке одного пакета удаляются только его собственные headers; другой набор сохраняется.
+`productAnalyticsInterceptor` независимо добавляет три `X-PA-*` заголовка, а `provideProductAnalytics(settings)` запускает engagement listeners до первого API-запроса. В полном режиме передаются шесть package-owned headers. При ошибке одного пакета удаляются только его current+legacy headers; другой набор сохраняется.
+
+`telemetryMeasurementId` и `analyticsMeasurementId` являются публичными project-specific environment values, не секретами. Backend должен сопоставлять их с собственной конфигурацией проекта. Отсутствие или неверный формат ID вызывает fail-open соответствующего пакета.
 
 `@angular/common`, `@angular/core` и `rxjs` объявлены как `peerDependencies`: пакет использует копии этих библиотек из приложения и не встраивает второй Angular в bundle. Текущий manifest требует Angular `>=16 <17` и RxJS `^7.8.0`; production, browser и isolated `.tgz` сборки проверены на Angular 16.2 / TypeScript 5.1.
 
@@ -467,12 +474,15 @@ import { TELEMETRY_SETTINGS } from '@company/marketing-telemetry';
 providers: [
   {
     provide: TELEMETRY_SETTINGS,
-    useValue: { conversion: { scorePrefix: '00' } },
+    useValue: {
+      measurementId: environment.telemetryMeasurementId,
+      conversion: { scorePrefix: '00' },
+    },
   },
 ]
 ```
 
-При ручном создании используется `new TelemetrySdk({ conversion: { scorePrefix: '00' } })`. Backend должен применять собственную согласованную настройку, а не доверять клиентскому выбору.
+При ручном создании используется `new TelemetrySdk({ measurementId: 'G-8F3K2M7Q', conversion: { scorePrefix: '00' } })`. Backend должен применять собственные согласованные project ID и prefix, а не доверять клиентскому выбору.
 
 ### 7.3. Timestamp и ручной API
 
@@ -487,14 +497,9 @@ WASM сам получает `floor(Date.now() / 1000)` и фиксирует ti
 ```text
 X-GA-Measurement-Id
 X-GA-Session-Id
-X-Amplitude-Device-Id
-X-Amplitude-Event-Id
-X-Amplitude-Session-Properties
-X-YM-Counter-Client
+X-GA-Session-Properties
 X-PA-Measurement-Id
 X-PA-Session-Id
-X-PA-Device-Id
-X-PA-Event-Id
 X-PA-Session-Properties
 ```
 
